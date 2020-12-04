@@ -1,4 +1,4 @@
-multi.carve <- function (x, y, B = 100, fraction = 0.5,
+multi.carve <- function (x, y, B = 50, fraction = 0.5,
           model.selector = lasso.cv, classical.fit = lm.pval,
           parallel = FALSE, ncores = getOption("mc.cores", 2L), 
           gamma = seq(ceiling(0.05 *B)/B, 1 - 1/B, by = 1/B), 
