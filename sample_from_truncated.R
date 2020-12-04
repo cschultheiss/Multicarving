@@ -1,4 +1,4 @@
-sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 1000,
+sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1000,
                                    sigma = 1, burnin = 500, ndraw = 1000, use_A = FALSE) {
   #Sample from a truncated normal with covariance
   #equal to sigma**2 I.
@@ -17,6 +17,7 @@ sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 10
   # sigma : Variance parameter, usually 1 since pre-withened
   # burnin : How many iterations until we start recording samples?
   # ndraw : How many samples should we return?
+  # use_A : if true, some of the movement is in the constrained directions 
   
   dims <- dim(A)
   nvar <- dims[2]
@@ -26,7 +27,7 @@ sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 10
   tol <- 1.e-7
   
   U <- A %*% state - b
-  # max(U)<0 if KKT actually fulfilled exactly
+  # max(U) < 0 if KKT actually fulfilled exactly
   if (max(U) > 0) {
     fc <- sum(U > 0) / nconstraint
     stop(paste(fc, "unfulfilled constraints at entry"))
@@ -37,7 +38,7 @@ sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 10
   
   # directions not parallel to coordinate axes
   if (use_A) {
-    # walk directions are partly a, partly random
+    # walk directions are partly from A, partly random
     if (nvar >= 5) {
       directions  <- rbind(A, matrix(rnorm(n = as.integer(nvar / 5) * nvar),
                                      nrow = as.integer(nvar / 5), ncol = nvar))
@@ -59,12 +60,12 @@ sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 10
   alphas_dir <- A %*% t(directions)
   alphas_coord <- A
   alphas_max_dir <- apply(abs(alphas_dir), 2 ,max) * tol
-  alphas_max_coord =apply(abs(alphas_coord), 2, max) * tol
+  alphas_max_coord <- apply(abs(alphas_coord), 2, max) * tol
   
   
   # choose the order of sampling (randomly)
   random_idx_dir <- sample(1:ndir, burnin + ndraw, replace = TRUE)
-  random_idx_coord = sample(1:nvar, burnin + ndraw, replace = TRUE)
+  random_idx_coord <- sample(1:nvar, burnin + ndraw, replace = TRUE)
 
   # for switching between coordinate updates and
   # other directions
@@ -98,7 +99,8 @@ sample_truncnorm_white <- function( A, b,initial, bias_direction, how_often = 10
   
     if (docoord == 1) {
       idx <- random_idx_coord[rand_count]
-      V <- state[idx] # V is given coordinate of state
+      V <- state[idx]
+      # V is given coordinate of state, i.e. projection on to coordinate axis
     } else if (!dobias) {
       idx <- random_idx_dir[rand_count]
       V <- sum(directions[idx, ] * state)
