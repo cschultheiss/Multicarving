@@ -1,7 +1,7 @@
 # Multicarving
 R Software for inference using multicarving as presented in https://arxiv.org/abs/2006.04613
 
-The code for this thesis consists of 8 files:
+The code for this project consists of 8 files:
     • 3 files for methodology: hdi_adjustments.R; optimal_inference.R; sample_from_truncated.R;
     • 4 files for simulations: all_multi_fix_fwer.R; binomial_all_multi_fix_fwer.R; group_example_mc.R; multi_ci.R
     • 1 file for error handling: tryCatch-W-E.R (not my own work)
@@ -20,6 +20,6 @@ group_example_mc.R: Executes simulations as described in Section 4.3, default is
 
 multi_ci.R: Executes simulations as described in section 4.2. Changes are possible based on user’s needs.
 
-All simulation files store the data needed for the analysis. The save location has to be adjusted based on user’s folder structure. Due to slight changes in the code that decrease redundancy and increase efficiency, the obtained results will not be exactly the same as shown in the thesis. However, as the methodology is not changed per se, the results should stay fairly similar.
+All simulation files store the data needed for the analysis. Due to recent changes in the code, the obtained results will not be exactly the same as shown in the paper. However, as the methodology is not changed per se, the results should stay fairly similar.
 
 tryCatch-W-E.R: Tries execution of the statement and stores potential errors and warnings. Provided to me by Claude Renaux.
