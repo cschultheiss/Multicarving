@@ -1,5 +1,5 @@
 # Multicarving
-R Software for inference using multicarving
+R Software for inference using multicarving as presented in https://arxiv.org/abs/2006.04613
 
 The code for this thesis consists of 8 files:
     • 3 files for methodology: hdi_adjustments.R; optimal_inference.R; sample_from_truncated.R;
