@@ -21,6 +21,13 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
   # family: Gaussian or binomial
   # ndraw: number of points to draw
   # burnin: number of initial points to burn
+  # ndraw and burning might be increased for high the degrees of freedom or due to required significance
+  # the following three values are used to defined the minimally required sample size
+  # sig_level: level for the hypothesis test
+  # Bonferroni: whether a Bonferroni correction will be applied
+  # aggregation: aggregation parameter \lambda_min
+  # selected: whether to use the selected viewpoint for aggregation
+  # verbose: print some key steps
   
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
@@ -56,6 +63,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
     } else if (length(beta) < p || length(beta) > p + 1) {
       stop("uninterpretable coefficients")
     }
+    # transformed data
     xbh <- beta[1] + X %*% beta[-1]
     ph <- exp(xbh) / (1 + exp(xbh))
     w <- ph * (1 - ph)
@@ -96,7 +104,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
     lamvec <- c(0, rep(lambda, s-1))
     b1 <- -diag(x = (z_E), nrow = s) %*% C %*% (lamvec * z_E) # linear constraint as derived in Lee et al. 2016
   } else {
-    b1 <- -lambda * diag(x = (z_E), nrow=s) %*% C %*% z_E # linear constraint as derived in Lee et al. 2016 
+    b1 <- -lambda * diag(x = (z_E), nrow = s) %*% C %*% z_E # linear constraint as derived in Lee et al. 2016 
   }
   if (selected) {
     if (n - splitn > s) {
@@ -107,7 +115,6 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       linear_part[, (s + 1):(2 * s)] <- -diag(z_E)
       b <- b1 
       
-      # specify covariance of 2s Gaussian vector
       # covariance of c(beta_hat_full, beta_hat_selection)
       cov <- matrix(0, 2 * s, 2 * s)
       cov[1:s, 1:s] <- inv_info_E
@@ -197,16 +204,15 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
         conditional_law.covariance <- con.covariance
         conditional_law.mean <- rep(0, dim(conditional_linear)[2])
       }
-      # browser()
       
       skip <<- FALSE # indicator whether Hamiltonian sampler shall be skipped right away
-      first_time <- TRUE # indicator whether it is the first chain for the given covariate
-      ft <<- TRUE # indicator to be shared with other functions
+      ft <<- TRUE # indicator whether it is the first chain for the given covariate
+      # both indicators are to be shared with other functions
+      
       # get a sample of points fulfilling all constraints
       Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
                                   initial, eta, ndraw = ndraw, burnin = burnin,
                                   how_often = 10, verbose = verbose)
-      # browser()
       continue <- FALSE
       i <- 0
       while (!continue) {
@@ -217,6 +223,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
         if (i > 5) break()
         observed <- sum(initial * eta)
         lennull <- length(null_statistics)
+        # calculate p-values on two halves of samples to estimate convergence
         if (beta[chosen[j]] > 0) {
           pval1 <- (sum(null_statistics[1:floor(lennull / 2)] >= observed) + 1) / (floor(lennull / 2) + 1)
           pval2 <- (sum(null_statistics[(floor(lennull / 2) + 1):lennull] >= observed) + 1) / (ceiling(lennull / 2) + 1)
@@ -224,33 +231,33 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           pval1 <- (sum(null_statistics[1:floor(lennull / 2)] <= observed) + 1) / (floor(lennull / 2) + 1)
           pval2 <- (sum(null_statistics[(floor(lennull / 2) + 1):lennull] <= observed) + 1) / (ceiling(lennull / 2) + 1)
         }
-        if (min(pval1, pval2) < sig_Level && first_time) {
+        if (min(pval1, pval2) < sig_Level && ft) {
+          # if potentially significant
           if (verbose) print("Checking significance with longer chain")
-          first_time <- FALSE
           ft <<- FALSE
           if (verbose) {
             print(paste("Increasing ndraw to ", 2 * max(min_size, ndraw), "and burnin to ", ndraw))
           }
           Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                      Z[lennull, ], eta, ndraw= 2 * max(min_size, ndraw), burnin = 0,
+                                      Z[lennull, ], eta, ndraw = 2 * max(min_size, ndraw), burnin = 0,
                                       how_often = 10, verbose = verbose)
           continue <- FALSE
-        } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5*sig_Level) {
+        } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
+          # if significance is contradicting on the two parts
           if (verbose) print("Appending the chain")
-          first_time <- FALSE
           ft <<- FALSE
           if (verbose) {
             print(paste("Adding", 2 * max(min_size, ndraw), "draws"))
           }
           Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                       Z[lennull, ], eta, ndraw= 2 * max(min_size, ndraw), burnin = 0,
+                                       Z[lennull, ], eta, ndraw = 2 * max(min_size, ndraw), burnin = 0,
                                        how_often = 10, verbose = verbose)
           Z <- rbind(Z, Zn)
           continue <- FALSE
         }
       }
       
-      add <- 1
+      add <- 1 # add <- 0 would allow for 0 pvalues
       if (beta[chosen[j]] > 0) {
         pvalues[j] <- (sum(null_statistics >= observed) + add) / (length(null_statistics) + add)
       } else {
@@ -326,12 +333,13 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       estimates <- estimates[-1]
       ses <- ses[-1]
     } 
+    # return extra information for saturated model in order to determine CI
     return(list(pv = pvalues, vlo = vlo, vup = vup, estimates = estimates, ses = ses))
   }
 }
 
 
-conditional<-function(S,mean,C,d) {
+conditional<-function(S, mean, C, d) {
   # Return an equivalent constraint 
   # after having conditioned on a linear equality.
   # Let the inequality constraints be specified by
@@ -358,8 +366,8 @@ conditional<-function(S,mean,C,d) {
 
 
 whiten<-function(cov, linear_part, b, mmean) {
-#   Return a whitened version of constraints in a different
-#   basis, and a change of basis matrix.
+  #   Return a whitened version of constraints in a different
+  #   basis, and a change of basis matrix.
 
   # calculate a root of the covariance matrix using EVD
   rank <- rankMatrix(cov)[1]
@@ -396,69 +404,64 @@ whiten<-function(cov, linear_part, b, mmean) {
 
 
 sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_interest,
-                            how_often = -1, ndraw = 1000, burnin = 1000, white=FALSE,
+                            how_often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
                             use_constraint_directions = TRUE, verbose = FALSE) {
+  # routine to do whitening, activate the sampler, and recolour the samples
   if (how_often < 0) {
     how_often <- ndraw + burnin
   }
-    
-  if (!white) {
-    white_out <- whiten(cov, linear_part, b, mmean)
-    forward_map <- white_out$forward_map
-    inverse_map <- white_out$inverse_map
-    new_A <- white_out$new_A
-    new_b <- white_out$new_b
-    white_Y <- forward_map(Y)
-    old <- FALSE
-    if (old || skip) {
+  
+  white_out <- whiten(cov, linear_part, b, mmean)
+  forward_map <- white_out$forward_map
+  inverse_map <- white_out$inverse_map
+  new_A <- white_out$new_A
+  new_b <- white_out$new_b
+  white_Y <- forward_map(Y)
+  if (skip) {
+    # if Hamiltonian sampler got stuck before for same set-up do not try again
+    white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
+    #  sample from whitened points with new constraints
+    white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
+                                           how_often = how_often, ndraw = ndraw, burnin = burnin,
+                                           sigma = 1, use_A = use_constraint_directions)
+    # recolour the withened samples
+    Z <- t(inverse_map(t(white_samples)))
+  } else {
+    # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
+    # current wrap around is not windows supported
+    nw <- length(white_Y)
+    trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
+                                                     -new_A, as.vector(new_b), burn.in = burnin)},
+                                               timeout = 6, on_timeout = "error"), 0)
+    if (!is.null(trywhite$error)) {
+      skip <<- TRUE
+      if (ft){
+        first_text <- "this variable was tested for the first time"
+      } else {
+        first_text <- "this variable was not tested for the first time"
+      }
+      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
       white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
       #  sample from whitened points with new constraints
       white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
-                                             how_often = how_often, ndraw = ndraw, burnin = burnin,
-                                             sigma=1, use_A = use_constraint_directions)
+                                              how_often = how_often, ndraw = ndraw, burnin = burnin,
+                                              sigma = 1, use_A = use_constraint_directions)
       # recolour the withened samples
       Z <- t(inverse_map(t(white_samples)))
     } else {
-      # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
-      # current wrap around is not windows supported
-      nw <- length(white_Y)
-      trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
-                                                       -new_A, as.vector(new_b), burn.in = burnin)},
-                                                 timeout = 6, on_timeout = "error"), 0)
-      if (!is.null(trywhite$error)) {
-        skip <<- TRUE
-        if (ft){
-          first_text <- "this variable was tested for the first time"
-        } else {
-          first_text <- "this variable was not tested for the first time"
-        }
-        warning(paste("Evaluation of Hamiltonian sampler not successfull:", trywhite$error, first_text, "using hit-and-run sampler"))
-        white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
-        #  sample from whitened points with new constraints
-        white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
-                                                how_often = how_often, ndraw = ndraw, burnin = burnin,
-                                                sigma=1, use_A = use_constraint_directions)
-        # recolour the withened samples
-        Z <- t(inverse_map(t(white_samples)))
-      } else {
-        white2 <- trywhite$value
-        # recolour the withened samples
-        Z <- t(inverse_map(t(white2)))
-      }
-      
+      white2 <- trywhite$value
+      # recolour the withened samples
+      Z <- t(inverse_map(t(white2)))
     }
-    # "else case", can be ignored, since our procedure always creates coloured points
-  } else {
-    Z <- sample_truncnorm_white(linear_part, b, Y, direction_of_interest, how_often = how_often,
-                                ndraw = ndraw, burnin = burnin, sigma = 1, use_A = use_constraint_directions)
+    
   }
-    return(Z)
+  return(Z)
 }
 
 
-OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda, family = "gaussian", groups,
-                                   intercept = TRUE,ndraw=8000, burnin=2000, verbose = FALSE,
-                                   sig_Level = 0.05, aggregation = 0.05, Bonferroni = TRUE) {
+OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian", groups,
+                                   intercept = TRUE, ndraw = 8000, burnin = 2000,
+                                   sig_Level = 0.05, aggregation = 0.05, Bonferroni = TRUE, verbose = FALSE) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -468,8 +471,17 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
   # tol.beta tolerance, to assume variable to be active
   # lambda: penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
+  # family: gaussian or binomial
+  # groups: groups to be tested
   # ndraw: number of points to draw
   # burnin: number of initial points to burn
+  # ndraw and burning might be increased for high the degrees of freedom or due to required significance
+  # the following three values are used to defined the minimally required sample size
+  # sig_level: level for the hypothesis test
+  # Bonferroni: whether a Bonferroni correction will be applied
+  # aggregation: aggregation parameter \lambda_min
+  # selected: whether to use the selected viewpoint for aggregation
+  # verbose: print some key steps
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
     stop(paste("Unknown family, family should be one of", paste(knownfamilies, collapse = ", ")))
@@ -503,6 +515,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     } else if (length(beta) < p || length(beta) > p + 1) {
       stop("uninterpretable coefficients")
     }
+    # transformed data
     xbh <- beta[1] + X %*% beta[-1]
     ph <- exp(xbh) / (1 + exp(xbh))
     w <- ph * (1 - ph)
@@ -524,7 +537,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     return(list(pv = rep(1, length(groups))))
   }
   if (intercept && s == 1 && !(0 %in% unlist(groups))) {
-    warning("Only intercept selected, not checking for that")
+    warning("Only intercept selected, not checking for that, returning 1")
     return(list(pv = rep(1, length(groups))))
   }
   
@@ -548,6 +561,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     b1 <- -lambda * diag(x = (z_E), nrow = s) %*% C %*% z_E # linear constraint as derived in Lee et al. 2016 
   }
   if (n == splitn) {
+    # pure post-selection inference
     # in this case we sample from c(beta_hat_selection)
     # linear constraint as derived in Lee et al. 2016,
     # adjusted for the fact, that sampling is not from y1, but from a linear transformation thereof
@@ -561,7 +575,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     
     # LHS of the additional equality constraint needed to sample for a specific coefficients
     # as explained in chapter 'Selective Inference for Linear Regression' of Fithian et al.
-    conditional_linear = matrix(0,nrow=s, ncol=s)
+    conditional_linear = matrix(0,nrow = s, ncol = s)
     conditional_linear[, 1:s]  = ginv(inv_info_E1)
     
     OLS_func <- inv_info_E %*% conditional_linear
@@ -621,7 +635,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     # a valid initial condition (assuming glmnet fulfills KKT, not always the case)
     initial = c(beta_E1, y[-ind]) 
   }
-  pvaluessum<-numeric(length(groups))
+  pvaluessum <- numeric(length(groups))
   j <- 0
   ndraw0 <- ndraw
   burnin0 <- burnin
@@ -659,6 +673,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
         conditional_law.covariance <- con.covariance - conditional_law$delta_cov
         conditional_law.mean <- -conditional_law$delta_mean
       } else {
+        # there is no additional equality constraint if all the selected variables are in the group
         conditional_law.covariance <- con.covariance
         conditional_law.mean <- rep(0,length(initial))
         
@@ -671,14 +686,17 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
         burnin <- ceiling(burnin0 * DOF / 15)
       }
       
-      skip <<- FALSE
-      ft <<- TRUE
+      skip <<- FALSE # indicator whether Hamiltonian sampler shall be skipped right away
+      ft <<- TRUE # indicator whether it is the first chain for the given covariate
+      # both indicators are to be shared with other functions
+      
+      # get a sample of points fulfilling all constraints
       Z <- sample_from_constraints(conditional_law.covariance, linear_part, b,
                                    conditional_law.mean, initial, eta, ndraw = ndraw,
                                    burnin = burnin, how_often = 10, verbose = verbose)
+      
       etasign <- t(t(eta)*sign(beta[chosen[group.vars]]))
       continue <- FALSE
-      first_time <- TRUE
 
       i <- 0
       while (!continue) {
@@ -691,19 +709,23 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
         sumnull_statistics <- apply(allnull_statistics, 1, sum)
         sumobserved <- sum(allobserved)
         lennull <- length(sumnull_statistics)
+        # calculate p-values on two halves of samples to estimate convergence
         pval1 <- (sum(sumnull_statistics[1:floor(lennull / 2)] >= sumobserved) + 1) / (floor(lennull / 2) + 1)
         pval2 <- (sum(sumnull_statistics[(floor(lennull / 2)+1):lennull] >= sumobserved) + 1) / (ceiling(lennull / 2) + 1)
-        if (min(pval1, pval2) < sig_Level && first_time) {
+        if (min(pval1, pval2) < sig_Level && ft) {
+          # if potentially significant
           if (verbose) print("Checking significance with longer chain")
-          first_time <- FALSE
           ft <<- FALSE
           Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
                                        Z[lennull, ], eta, ndraw=2 * max(min_size, ndraw), burnin=0,
                                        how_often = 10, verbose = verbose)
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
+          # if significance is contradicting on the two parts
           if (verbose) print("Appending the chain")
-          first_time <- FALSE
+          if (verbose) {
+            print(paste("Adding", 2 * max(min_size, ndraw), "draws"))
+          }
           ft <<- FALSE
           Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
                                         Z[lennull, ], eta, ndraw=2 * max(min_size, ndraw), burnin = 0,
@@ -719,7 +741,8 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
       allobserved <- initial %*% etasign
       sumnull_statistics <- apply(allnull_statistics, 1, sum)
       sumobserved <- sum(allobserved)
-      pvaluessum[j] <- (sum(sumnull_statistics >= sumobserved) + 1) / (length(sumnull_statistics) + 1)
+      add <- 1 # add <- 0 would allow for 0 pvalues
+      pvaluessum[j] <- (sum(sumnull_statistics >= sumobserved) + add) / (length(sumnull_statistics) + add)
     } else {
       if (verbose) print(paste("Not checking group", j))
       pvaluessum[j] <- 1
@@ -734,6 +757,15 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
 
 constraint_checker<-function(X1, y1, beta, tol.beta, lambda,
                             family = "gaussian", intercept = TRUE, verbose = FALSE) {
+  # to be applied after Lasso Selection, checks if Lasso convergence is sufficient to run the carving routine
+  # X1: selection part of X
+  # y1: selection part of y
+  # beta: coefficients obtained from Lasso selection
+  # sigma: standard deviation, assumed to be known for Gaussian
+  # tol.beta tolerance, to assume variable to be active
+  # lambda: penalty parameter used for Lasso 
+  # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
+  # family: Gaussian or binomial
   knownfamilies <- c("gaussian", "binomial")
   if (!family %in% knownfamilies) {
     stop(paste("Unknown family, family should be one of", paste(knownfamilies, collapse = ", ")))
@@ -767,6 +799,7 @@ constraint_checker<-function(X1, y1, beta, tol.beta, lambda,
     } else if (length(beta) < p || length(beta) > p + 1) {
       stop("uninterpretable coefficients")
     }
+    # transformed data
     xbh <- beta[1] + X1 %*% beta[-1]
     ph <- exp(xbh) / (1 + exp(xbh))
     w <- ph * (1 - ph)
