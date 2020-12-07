@@ -4,14 +4,11 @@ if (local) {
 } else {
   source("sample_from_truncated.R")
 }
-skip <- FALSE
-ft <- TRUE
+
 
 OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian",
                             intercept = TRUE, ndraw = 8000, burnin = 2000, sig_Level = 0.05,
                             Bonferroni = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE) {
-  if (verbose) print(family)
-  if (verbose) print(sigma)
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -34,8 +31,6 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
   splitn <- length(ind)
   if (family == "gaussian") {
     if (is.null(sigma)) stop("Sigma needs to be provided for Gaussian family")
-    if (verbose) cat("sigma known \n")
-    if (verbose) print(sigma)
     if (length(beta) == p + 1) {
       if (!intercept) {
         if (verbose) print("expected p coefficients, received p+1, ignoring first")
@@ -176,18 +171,20 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       ndraw <- ceiling(ndraw0 * DOF / 15)
       burnin <- ceiling(burnin0 * DOF / 15)
       if (verbose) {
-        print(paste("Increasing ndraw to ", ndraw, "and burnin to ", burnin))
+        print(paste("Increasing ndraw to ", ndraw, "and burnin to ", burnin, "due to degrees of freedom"))
       }
     }
     
+    nskipped <- 0 
     for (j in 1:s) {
+      if (intercept && j == 1) next ()
       if (intercept) {
-        if (verbose) print(paste("Inference for", j-1))
+        if (verbose) print(paste("Inference for", chosen[j]-1))
       } else {
-        if (verbose) print(paste("Inference for", j)) 
+        if (verbose) print(paste("Inference for", chosen[j])) 
       }
       
-      if (intercept && j == 1) next ()
+      
       eta <- OLS_func[j,]
       # direction to project samples on to afterwards
 
@@ -202,9 +199,10 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
         conditional_law.mean <- rep(0, dim(conditional_linear)[2])
       }
       # browser()
-
-      first_time <- TRUE
-      ft <<- TRUE
+      
+      skip <<- FALSE # indicator whether Hamiltonian sampler shall be skipped right away
+      first_time <- TRUE # indicator whether it is the first chain for the given covariate
+      ft <<- TRUE # indicator to be shared with other functions
       # get a sample of points fulfilling all constraints
       Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
                                   initial, eta, ndraw = ndraw, burnin = burnin,
@@ -228,7 +226,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           pval2 <- (sum(null_statistics[(floor(lennull / 2) + 1):lennull] <= observed) + 1) / (ceiling(lennull / 2) + 1)
         }
         if (min(pval1, pval2) < sig_Level && first_time) {
-          if (verbose) print("Checking significance")
+          if (verbose) print("Checking significance with longer chain")
           first_time <- FALSE
           ft <<- FALSE
           if (verbose) {
@@ -239,11 +237,11 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
                                       how_often = 10, verbose = verbose)
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5*sig_Level) {
-          if (verbose) print("Appending chain")
+          if (verbose) print("Appending the chain")
           first_time <- FALSE
           ft <<- FALSE
           if (verbose) {
-            print(paste("Increasing ndraw to ", 2 * max(min_size, ndraw)))
+            print(paste("Adding", 2 * max(min_size, ndraw), "draws"))
           }
           Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
                                        Z[lennull, ], eta, ndraw= 2 * max(min_size, ndraw), burnin = 0,
@@ -259,8 +257,15 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       } else {
         pvalues[j] <- (sum(null_statistics <= observed) + add) / (length(null_statistics) + add)
       }
+      if (skip) nskipped <- nskipped + 1
       skip <<- FALSE
     }
+    if (intercept){
+      warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s-1, "variables"))
+    } else {
+      warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s, "variables"))
+    }
+    
     if (intercept) pvalues <- pvalues[-1]
     return(list(pv = pvalues))
   } else {
@@ -277,13 +282,14 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
     estimates <- numeric(s)
     ses <- numeric(s)
     for (j in 1:s) {
+      if (intercept && j==1) next ()
       if (intercept) {
-        if (verbose) print(paste("Inference for", j-1))
+        if (verbose) print(paste("Inference for", chosen[j]-1))
       } else {
-        if (verbose) print(paste("Inference for", j)) 
+        if (verbose) print(paste("Inference for", chosen[j])) 
       }
       
-      if (intercept && j==1) next ()
+      
       eta <- Xinv[j, ]
       Pnoteta <- diag(length(y_o)) - eta %*% t(eta) / (norm(eta, "2") ^ 2)
       z <- Pnoteta %*% y_o
@@ -306,7 +312,13 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       } else {
         pvalues[j] <- 1-selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus)
       }
-      if (is.na(pvalues[j])) warning(paste(etay, Vmin, Vplus, sigeta))
+      if (is.na(pvalues[j])){
+        if (intercept){
+          warning(paste("p-value for", chosen[j] - 1, "was set to NA"))
+        } else {
+          warning(paste("p-value for", chosen[j], "was set to NA"))
+        }
+      } 
     }
     if (intercept) {
       pvalues <- pvalues[-1]
@@ -358,7 +370,7 @@ whiten<-function(cov, linear_part, b, mmean) {
   U <- ev$vectors
   Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
   while (!is.null(Dtry$warning)) {
-    print("Reducing Rank")
+    warning("Reducing Rank")
     rank <- rank - 1
     Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
   }
@@ -387,7 +399,6 @@ whiten<-function(cov, linear_part, b, mmean) {
 sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_interest,
                             how_often = -1, ndraw = 1000, burnin = 1000, white=FALSE,
                             use_constraint_directions = TRUE, verbose = FALSE) {
-  print(ft)
   if (how_often < 0) {
     how_often <- ndraw + burnin
   }
@@ -417,7 +428,12 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
                                                  timeout = 6, on_timeout = "error"), 0)
       if (!is.null(trywhite$error)) {
         skip <<- TRUE
-        warning(paste(trywhite$error, ft, "using other sampler", format(runif(1), digits = 4)))
+        if (ft){
+          first_text <- "this variable was tested for the first time"
+        } else {
+          first_text <- "this variable was not tested for the first time"
+        }
+        warning(paste("Evaluation of Hamiltonian sampler not successfull:", trywhite$error, first_text, "using hit-and-run sampler"))
         white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
         #  sample from whitened points with new constraints
         white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
@@ -426,7 +442,6 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
         # recolour the withened samples
         Z <- t(inverse_map(t(white_samples)))
       } else {
-        warning(paste("New sampler succesful", format(runif(1), digits = 4)))
         white2 <- trywhite$value
         # recolour the withened samples
         Z <- t(inverse_map(t(white2)))
@@ -445,8 +460,6 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
 OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda, family = "gaussian", groups,
                                    intercept = TRUE,ndraw=8000, burnin=2000, verbose = FALSE,
                                    sig_Level = 0.05, aggregation = 0.05, Bonferroni = TRUE) {
-  if (verbose) cat("sigma known \n")
-  if (verbose) print(family)
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -466,8 +479,6 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
   p <- dim(X)[2]
   if (family == "gaussian") {
     if (is.null(sigma)) stop("Sigma needs to be provided for Gaussian family")
-    if (verbose) cat("sigma known \n")
-    if (verbose) print(sigma)
     if (length(beta) == p + 1) {
       if (!intercept) {
         if (verbose) print("expected p coefficients, received p+1, ignoring first")
@@ -478,7 +489,6 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
         if (verbose) print("expected p+1 coefficients, received p, reestimating intercept")
         intc <- mean(y[ind] - X[ind, ] %*% beta)
         if (verbose) print(intc)
-        beta <- c(intc, beta)
       }
     } else {
       stop("uninterpretable coefficients")
@@ -628,6 +638,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
   correction_factor <- (1 - log(aggregation)) / aggregation
   min_size <- ceiling(1/(sig_Level/correction_factor))
 
+  nskipped <- 0
   for (group in groups) {
     j <- j+1
     if (intercept) {
@@ -637,6 +648,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
     }
 
     if (length(group.vars) > 0) {
+      if (verbose) print(paste("Inference for group", j))
       eta <- matrix(t(OLS_func[group.vars, ]), ncol = length(group.vars))
       # directions to project samples on to afterwards
       
@@ -683,7 +695,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
         pval1 <- (sum(sumnull_statistics[1:floor(lennull / 2)] >= sumobserved) + 1) / (floor(lennull / 2) + 1)
         pval2 <- (sum(sumnull_statistics[(floor(lennull / 2)+1):lennull] >= sumobserved) + 1) / (ceiling(lennull / 2) + 1)
         if (min(pval1, pval2) < sig_Level && first_time) {
-          if (verbose) print("Checking significance")
+          if (verbose) print("Checking significance with longer chain")
           first_time <- FALSE
           ft <<- FALSE
           Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
@@ -691,7 +703,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
                                        how_often = 10, verbose = verbose)
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
-          if (verbose) print("Appending chain")
+          if (verbose) print("Appending the chain")
           first_time <- FALSE
           ft <<- FALSE
           Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
@@ -710,11 +722,13 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
       sumobserved <- sum(allobserved)
       pvaluessum[j] <- (sum(sumnull_statistics >= sumobserved) + 1) / (length(sumnull_statistics) + 1)
     } else {
-      if (verbose) cat("not checking that group \n")
+      if (verbose) print(paste("Not checking group", j))
       pvaluessum[j] <- 1
     }
+    if (skiped) nskipped <- nskipped + 1
     skip <<- FALSE
   }
+  warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngrouptested, "groups"))
   return(list(pv = pvaluessum))
 }
 
@@ -737,7 +751,6 @@ constraint_checker<-function(X1, y1, beta, tol.beta, lambda,
       if (intercept) {
         if (verbose) print("expected p+1 coefficients, received p, reestimating intercept")
         intc <- mean(y1 - X1 %*% beta)
-        if (verbose) print(intc)
         beta <- c(intc, beta)
       }
     } else {
@@ -770,7 +783,7 @@ constraint_checker<-function(X1, y1, beta, tol.beta, lambda,
   chosen <- which(abs(beta) > tol.beta) # selected variables
   s <- length(chosen)
   if ((s == 0 && !intercept) || (s == 1 && intercept)) {
-    warning("Checking empty model without intercept, by default TRUE since only active constraints are checked")
+    warning("Checking empty model, by default TRUE since only active constraints are checked")
     return(TRUE)
   }
 
