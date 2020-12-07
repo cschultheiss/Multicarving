@@ -84,28 +84,17 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         y.left <- y[split]
         x.right <- x[-split, ]
         y.right <- y[-split]
-        if ("lambda" %in% names(formals(model.selector))) {
-          nepssim <- 1000
-          linf <- numeric(nepssim)
-          for (i in 1:nepssim) {
-            eps <- rnorm(n.left)
-            linf[i] <- norm(t(x.left) %*% eps, "I")
-          }
-          lambda <- 2 * mean(linf) * globalSigma #lambda according to paper
-          output <- do.call(model.selector, args = c(list(x = x.left, 
-                                                          y = y.left, lambda=lambda), args.model.selector))
-          sel.model <- output$sel.model
-          beta <- output$beta
-        } else {
-          output <- do.call(model.selector, args = c(list(x = x.left, 
-                                                          y = y.left), args.model.selector))
-          sel.model <- output$sel.model
-          beta <- output$beta
-          lambda <- output$lambda
-        }
+
+        output <- do.call(model.selector, args = c(list(x = x.left, 
+                                                        y = y.left), args.model.selector))
+        sel.model <- output$sel.model
+        beta <- output$beta
+        lambda <- output$lambda
+        
         fit_again <- TRUE
         thresh_count <- 0
         p.sel <- length(sel.model)
+        # for empty model, active constraints are trivially fulfilled
         if (p.sel == 0) fit_again <- FALSE
 
         while (fit_again) {
@@ -115,6 +104,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
           if (is.null(checktry$error)) {
             check <- checktry$value
           } else {
+            # if run into numerical instability when checking constraints
             check <- TRUE
             split_again <- TRUE
             warning(paste(checktry$error, p.sel, " variables selected with ",
@@ -142,13 +132,14 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
             if (family == "binomial") beta <- coefs
             p.sel <- length(sel.model)
             if (p.sel == 0) fit_again <- FALSE
-            warning(paste("reducing threshold", thresh_count, "from", threshn, sep = " "))
+            warning(paste("reducing threshold", thresh_count, "to", threshn, sep = " "))
           }
         }
           
         p.sel <- length(sel.model)
+        # use new split in case of singularity. This is mostly an issue for discrete x.
         if (args.model.selector$intercept) {
-          if ((p.sel > 1 && (rankMatrix(cbind(rep(1, n.left), x.left[, sel.model]))[[1]]< (p.sel + 1) ||
+          if ((p.sel > 0 && (rankMatrix(cbind(rep(1, n.left), x.left[, sel.model]))[[1]]< (p.sel + 1) ||
                             (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[, sel.model]))[[1]] < (p.sel + 1)))) ||
               fit_again) split_again <- TRUE
         } else {
@@ -158,8 +149,14 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         }
         if (split_again) {
           reason <- numeric(0)
-          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel+1)) reason <- c(reason, "1")
-          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel+1)) reason <- c(reason, "2")
+          if (args.model.selector$intercept){
+            if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
+            if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+          } else {
+            if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
+            if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+          }
+
           if (fit_again) reason <- c(reason, "3")
           split_count <- split_count + 1
           if (split_count > 4) {
@@ -170,7 +167,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
           warning(paste("Splitting again ", split_count, "reason", reason))
         }
       }
-      p.sel1 <- p.sel
+
       if (se.estimator == "modwise" && family == "gaussian") {
         if (length(beta) == p + 1) beta <- beta[-1]
         if (args.model.selector$intercept){
@@ -194,6 +191,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         args.lasso.inference$sigma <- sigma_model
         args.classical.fit$Sigma <- sigma_model
       }
+      
       if (p.sel > 0) {
         fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
                                                                         lambda = lambda, intercept = args.model.selector$intercept),
@@ -215,74 +213,67 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
           }
         }
         if (continue) {
-          if (p.sel > 0)  fLI <- fLItry$value
-          if (p.sel > 0 && p.sel < nrow(x.left) - 1) {
-            sel.pval1 <- fLI$pv
-            if (any(is.na(sel.pval1))) {
-              warning(sel.pval1)
-              stop("The carve procedure returned a p-value NA")
-            } 
-            if (length(sel.pval1) != p.sel) { 
-              cat(sel.pval1,"\n")
-              cat(sel.model,"\n")
-              stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel.",
-                         p.sel, p.sel1, length(sel.pval1)))
-            }
-            if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
-              warning(sel.pval1)
-              stop("The carve procedure returned values below 0 or above 1 as p-values")
-            }
-            if (FWER) {
-              sel.pval1 <- pmin(sel.pval1 * p.sel, 1) #for FWER
-            } else {
-              sel.pval1 <- pmin(sel.pval1, 1) #for FCR
-            }
-            if (split_pval) {
-              if (args.model.selector$intercept) {
-                bound <- n.right-1
-              } else {
-                bound <- n.right
-              }
-              if (p.sel > 0 && p.sel < bound) {
-                sel.pval2try <- tryCatch_W_E(do.call(classical.fit, 
-                                                     args = c(list(x = x.right[, sel.model], y = y.right), args.classical.fit)),
-                                             rep(NA,p.sel))
-                sel.pval2 <- sel.pval2try$value
-                if ("glm.fit: algorithm did not converge" %in% sel.pval2try$warning) {
-                  warning(sel.pval2try$warning)
-                }
-                if (!is.null(sel.pval2try$error)) {
-                  warning(paste(sel.pval2try$error, "while caluclatng split p-values", sep=" "))
-                }
-                NAs <- FALSE
-                if (any(is.na(sel.pval2))) NAs <- TRUE
-                #   stop("The classical.fit function returned a p-value NA")
-                if (length(sel.pval2) != p.sel) 
-                  stop("The classical.fit function didn't return the correct number of p-values for the provided submodel.")
-                if (!all(sel.pval2 >= 0 & sel.pval2 <= 1) && !NAs) 
-                  stop("The classical.fit function returned values below 0 or above 1 as p-values")
-                if (FWER) {
-                  sel.pval2 <- pmin(sel.pval2 * p.sel, 1) #for FWER
-                } else {
-                  sel.pval2 <- pmin(sel.pval2, 1) #for FCR
-                }
-                pvals.v[1, sel.model] <- sel.pval1
-                pvals.v[2, sel.model] <- sel.pval2
-              } else {
-                pvals.v[1,sel.model] <- sel.pval1
-              }
-            } else {
-              pvals.v[sel.model] <- sel.pval1
-            }
-
-            if (return.selmodels) 
-              sel.models[sel.model] <- TRUE
-            try.again <- FALSE
+          fLI <- fLItry$value
+          sel.pval1 <- fLI$pv
+          if (any(is.na(sel.pval1))) {
+            stop("The carve procedure returned a p-value NA")
+          } 
+          if (length(sel.pval1) != p.sel) { 
+            stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel.",
+                       p.sel, length(sel.pval1)))
           }
+          if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
+            stop("The carve procedure returned values below 0 or above 1 as p-values")
+          }
+          if (FWER) {
+            sel.pval1 <- pmin(sel.pval1 * p.sel, 1) # for FWER
+          } else {
+            sel.pval1 <- pmin(sel.pval1, 1) # for FCR
+          }
+          if (split_pval) {
+            if (args.model.selector$intercept) {
+              bound <- n.right-1
+            } else {
+              bound <- n.right
+            }
+            if (p.sel < bound) {
+              sel.pval2try <- tryCatch_W_E(do.call(classical.fit, 
+                                                   args = c(list(x = x.right[, sel.model], y = y.right), args.classical.fit)),
+                                           rep(NA, p.sel))
+              sel.pval2 <- sel.pval2try$value
+              if (!is.null(sel.pval2try$error)) {
+                warning(paste(sel.pval2try$error, "while caluclatng split p-values", sep=" "))
+              }
+              NAs <- FALSE
+              if (any(is.na(sel.pval2))) NAs <- TRUE
+              # do not stop if splitting leads to NA
+              if (length(sel.pval2) != p.sel) 
+                stop("The classical.fit function didn't return the correct number of p-values for the provided submodel.")
+              if (!all(sel.pval2 >= 0 & sel.pval2 <= 1) && !NAs) 
+                stop("The classical.fit function returned values below 0 or above 1 as p-values")
+              if (FWER) {
+                sel.pval2 <- pmin(sel.pval2 * p.sel, 1) # for FWER
+              } else {
+                sel.pval2 <- pmin(sel.pval2, 1) # for FCR
+              }
+              pvals.v[1, sel.model] <- sel.pval1
+              pvals.v[2, sel.model] <- sel.pval2
+            } else {
+              # if split p-values can not be determined, leave them at 1
+              pvals.v[1,sel.model] <- sel.pval1
+            }
+          } else {
+            pvals.v[sel.model] <- sel.pval1
+          }
+
+          if (return.selmodels) 
+            sel.models[sel.model] <- TRUE
+          try.again <- FALSE
         }
       }
 
       if (p.sel == 0) {
+        # leave all p-values to be 1
         if (verbose) 
           cat("......Empty model selected. That's ok...\n")
         try.again <- FALSE
