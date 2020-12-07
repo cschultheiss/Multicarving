@@ -1,16 +1,13 @@
 sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1000,
                                    sigma = 1, burnin = 500, ndraw = 1000, use_A = FALSE) {
-  #Sample from a truncated normal with covariance
-  #equal to sigma**2 I.
-  #Constraint is $Ax \leq b$ where `A` has shape
-  #`(q,n)` with `q` the number of constraints and
-  #`n` the number of random variables.
-  #Parameters
-  #----------
+  # Sample from a truncated normal with covariance equal to sigma**2 I.
+  # Constraint is $Ax \leq b$ where `A` has shape
+  # `(q,n)` with `q` the number of constraints and
+  # `n` the number of random variables.
+  # Parameters
   # A : Linear part of affine constraints.
   # b : Offset part of affine constraints.
-  # initial : Initial point for Gibbs draws.
-  # Assumed to satisfy the constraints.
+  # initial : Initial point for Gibbs draws assumed to satisfy the constraints.
   # bias_direction : Which projections are of most interest?
   # how_often : How often should the sampler make a move along `direction_of_interest`?
   # If negative, defaults to ndraw+burnin  (so it will never be used).
@@ -52,7 +49,7 @@ sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1
   
   directions <- rbind(directions, t(bias_direction)) # last directions are directions of interest
   directions <- t(directions)
-  #make columns have unit length
+  # make columns have unit length since only direction is of interest
   directions <- scale(directions, center = FALSE, scale = sqrt(colSums(directions ^ 2))) 
   directions <-t(directions)
   ndir <- dim(directions)[1]
@@ -141,8 +138,8 @@ sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1
     }
   
   
-    lower_bound = lower_bound / sigma
-    upper_bound = upper_bound / sigma
+    lower_bound <- lower_bound / sigma
+    upper_bound <- upper_bound / sigma
     # 
   
     if (lower_bound > upper_bound) {
