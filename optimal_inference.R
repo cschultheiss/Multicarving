@@ -40,7 +40,6 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       if (intercept) {
         if (verbose) print("expected p+1 coefficients, received p, reestimating intercept")
         intc <- mean(y[ind] - X[ind, ] %*% beta)
-        if (verbose) print(intc)
         beta <- c(intc, beta)
       }
     } else {
@@ -488,7 +487,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
       if (intercept) {
         if (verbose) print("expected p+1 coefficients, received p, reestimating intercept")
         intc <- mean(y[ind] - X[ind, ] %*% beta)
-        if (verbose) print(intc)
+        beta <- c(intc, beta)
       }
     } else {
       stop("uninterpretable coefficients")
@@ -725,7 +724,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma=NULL, tol.beta,lambda,
       if (verbose) print(paste("Not checking group", j))
       pvaluessum[j] <- 1
     }
-    if (skiped) nskipped <- nskipped + 1
+    if (skip) nskipped <- nskipped + 1
     skip <<- FALSE
   }
   warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngrouptested, "groups"))
