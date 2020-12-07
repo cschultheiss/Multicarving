@@ -1,9 +1,6 @@
-local <- local
-if (local) {
-  source("C:/Users/Christoph/Documents/ETH/MA/R_trials/sample_from_truncated.R")
-} else {
-  source("sample_from_truncated.R")
-}
+# this file contains the necessary routines to execute data carving after model selection
+# either for single variable testing or group testing
+# the sampler is defined elsewhere
 
 
 OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian",

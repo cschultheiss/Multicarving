@@ -1,3 +1,5 @@
+# this file contains the hit-and-run sampler applicable to carving
+
 sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1000,
                                    sigma = 1, burnin = 500, ndraw = 1000, use_A = FALSE) {
   # Sample from a truncated normal with covariance equal to sigma**2 I.

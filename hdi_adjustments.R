@@ -1,3 +1,6 @@
+# this file contains functions adapted from the functions in hdi for multisplitting
+# making the applicable to multicarving
+
 multi.carve <- function (x, y, B = 50, fraction = 0.5,
           model.selector = lasso.cv, classical.fit = lm.pval,
           parallel = FALSE, ncores = getOption("mc.cores", 2L), 
