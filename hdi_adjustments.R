@@ -1,28 +1,60 @@
 # this file contains functions adapted from the functions in hdi for multisplitting
 # making the applicable to multicarving
 
-multi.carve <- function (x, y, B = 50, fraction = 0.5,
-          model.selector = lasso.cv, classical.fit = lm.pval,
+multi.carve <- function (x, y, B = 50, fraction = 0.9,
+          model.selector = lasso.cvcoef, classical.fit = lm.pval.flex,
           parallel = FALSE, ncores = getOption("mc.cores", 2L), 
-          gamma = seq(ceiling(0.05 *B)/B, 1 - 1/B, by = 1/B), 
-          args.model.selector = list(intercept=TRUE,standardize=FALSE), 
-          args.classical.fit = NULL, return.nonaggr = FALSE, return.selmodels = FALSE,
-          repeat.max = 20, verbose = FALSE, FWER = FALSE, split_pval=TRUE,
-          use_sigma_modwise = FALSE, ttest = FALSE,
-          args.lasso_inference = list(sigma = NA,intercept = TRUE)) {
-  if (is.null(args.model.selector$family)) {
-    family <- "gaussian"
-  } else {
-    family <- args.model.selector$family
-  }
-  globalSigma <- args.lasso_inference$sigma
-  if (is.na(args.lasso_inference$sigma) && family == "gaussian") {
-      estSigma <- estimateSigma(scale(x,T,F), scale(y,T,F), intercept = FALSE, standardize=FALSE)
+          gamma = ((1:50)/B)[((1:50)/50) >= 0.05],
+          family = "gaussian",
+          args.model.selector = list(intercept = TRUE, standardize = FALSE),
+          se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
+          args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE,
+          verbose = FALSE, FWER = TRUE, split_pval= TRUE,
+          use_sigma_modwise = FALSE,
+          args.lasso.inference = list(sigma = NA)) {
+  # routine to split the data, select a model and calculate carving p-values B times
+  # x: matrix of predictors
+  # y: response vector
+  # B: number of splits
+  # fraction: fraction used for selection
+  # model.selector: how the model is chosen
+  # classical.fit: function to calculate splitting p-values
+  # parallel: whether to parallelize the splits
+  # ncores: number of cores for parallelization
+  # gamma: quantiles to consider, if several, additional penalty is applied
+  # family: gaussian or binomial
+  # args.model.selector: additional arguments for selection process
+  # args.classical.fit: additional arguments for calculatin splitting p-values
+  # return.nonaggr: shall raw p-values be returned
+  # return sel.models: shall the information, which model was selected be returned
+  # verbose: whether to print key steps
+  # FWER: shall a FWER correction be applied
+  # split_pval: shall p-values for splitting be determined as well
+  # use_sigma_modwise: shall sigma be calculated on a per model basis
+  # args.lasso.inference: additional arguments for inference after Lasso
+  
+  
+  args.model.selector$family <- family
+  if (family == "gaussian"){
+    if (se.estimator == "None" && is.na(args.lasso.inference$sigma)) stop("Neither SE estimator type nor sigma provided for Gaussian family. This is not ok")
+    if (is.na(args.lasso.inference$sigma)) {
+      if (se.estimator %in% c("1se", "modwise")){
+        use_lambda.min = FALSE
+      } else {
+        use_lambda.min = TRUE
+      }
+      estSigma <- do.call(estimateSigma.flex,
+                         args = c(list(x = x, y = y, use_lambda.min = use_lambda.min), args.se.estimator))
       globalSigma <- estSigma$sigmahat
-      args.lasso_inference$sigma <- globalSigma
-      if (ttest == FALSE) args.classical.fit$Sigma <- globalSigma
+      args.lasso.inference$sigma <- globalSigma
+      args.classical.fit$Sigma <- globalSigma
+    } else {
+      # provided sigma has priority over se estimator
+      se.estimator <- "None"
+      globalSigma <- args.lasso.inference$sigma
+      args.classical.fit$Sigma <- globalSigma
+    }
   }
-  if (ttest && family == "gaussian") args.classical.fit$Sigma <- NA
 
   n <- nrow(x)
   p <- ncol(x)
@@ -37,7 +69,6 @@ multi.carve <- function (x, y, B = 50, fraction = 0.5,
     }
     sel.models <- logical(p)
     try.again <- TRUE
-    repeat.count <- 0L
     fLI_error <- 0L
     split_count <- 0
     while (try.again) {
@@ -75,7 +106,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.5,
         fit_again <- TRUE
         thresh_count <- 0
         p.sel <- length(sel.model)
-        if (p.sel == 0) fit_again=FALSE
+        if (p.sel == 0) fit_again <- FALSE
 
         while (fit_again) {
           fit_again <- FALSE
@@ -140,18 +171,33 @@ multi.carve <- function (x, y, B = 50, fraction = 0.5,
         }
       }
       p.sel1 <- p.sel
-      if (use_sigma_modwise && family == "gaussian") {
+      if (se.estimator == "modwise" && family == "gaussian") {
         if (length(beta) == p + 1) beta <- beta[-1]
-        RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-        sigma_model <- sqrt(RSS / (n - p.sel))
+        if (args.model.selector$intercept){
+          RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
+          if (args.se.estimator$df_corr) {
+            den <- n - p.sel - 1
+          } else {
+            den <- n
+          }
+          sigma_model <- sqrt(RSS / den)
+        } else {
+          RSS <- sum((y- x %*% beta) ^ 2)
+          if (args.se.estimator$df_corr) {
+            den <- n - p.sel
+          } else {
+            den <- n
+          }
+          sigma_model <- sqrt(RSS / den)
+        }
         estSigma <- sigma_model
-        args.lasso_inference$sigma <- sigma_model
-        if (ttest==FALSE) args.classical.fit$Sigma <- sigma_model
+        args.lasso.inference$sigma <- sigma_model
+        args.classical.fit$Sigma <- sigma_model
       }
       if (p.sel > 0) {
         fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
                                                                         lambda = lambda, intercept = args.model.selector$intercept),
-                                                                   args.lasso_inference)), 0)
+                                                                   args.lasso.inference)), 0)
         if (!is.null(fLItry$error)) {
           if (verbose) {
             cat("......split again...\n")
@@ -241,14 +287,11 @@ multi.carve <- function (x, y, B = 50, fraction = 0.5,
           cat("......Empty model selected. That's ok...\n")
         try.again <- FALSE
       }
-      if (repeat.count > repeat.max) {
-        stop("More than repeat.max=", repeat.max, " sample splits resulted in too large models...giving up")
-      }
 
 
     }
     list(pvals = pvals.v, sel.models = sel.models, 
-         repeat.count = repeat.count, split = split)
+         split = split)
   }
   split.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
@@ -359,9 +402,7 @@ fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact 
   return(list(sel.model = chosen, beta = beta, lambda = lambda))
 }
 
-lm.pval.flex <- function (x, y, exact = TRUE, intercept=TRUE, Sigma = NA, ...) {
-  print(Sigma)
-  # same as lm.pval but fit without intercept
+lm.pval.flex <- function (x, y, exact = TRUE, intercept = TRUE, Sigma = NA, ttest = TRUE, ...) {
   if (intercept) {
     fit.lm <- lm(y ~ x, ...)
     fit.summary <- summary(fit.lm)
@@ -372,13 +413,13 @@ lm.pval.flex <- function (x, y, exact = TRUE, intercept=TRUE, Sigma = NA, ...) {
     tstat <- coef(fit.summary)[, "t value"]
   }
   
-  if (is.na(Sigma)) {
+  if (is.na(Sigma) || ttest) {
     setNames(2 * (if (exact) 
       pt(abs(tstat), df = fit.lm$df.residual, lower.tail = FALSE)
       else pnorm(abs(tstat), lower.tail = FALSE)), colnames(x)) 
   } else {
     sigma_hat<-sqrt(sum((fit.lm$residuals) ^ 2) / fit.lm$df.residual)
-    setNames(2 * pnorm(abs(tstat * sigma_hat / Sigma),lower.tail = FALSE), colnames(x))
+    setNames(2 * pnorm(abs(tstat * sigma_hat / Sigma), lower.tail = FALSE), colnames(x))
   }
 }
 
@@ -448,17 +489,23 @@ lasso.cvcoef<-function (x, y, nfolds = 10, grouped = nrow(x) > 3 * nfolds,
   return(list(sel.model = chosen,beta = return_beta,lambda = lambda*dim(x)[1]))
 }
 
-estimateSigma.1se <- function (x, y, intercept = TRUE, standardize = TRUE) {
+estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df_corr = FALSE) {
   selectiveInference:::checkargs.xy(x, rep(0, nrow(x)))
   if (nrow(x) < 10) 
     stop("Number of observations must be at least 10 to run estimateSigma")
   cvfit <- cv.glmnet(x, y, intercept = intercept, standardize = standardize)
   lamhat <- cvfit$lambda.1se
-  fit <- glmnet(x, y, standardize = standardize)
+  if (use_lambda.min) lamhat <- cvfit$lambda.min
+  fit <- glmnet(x, y, intercept = intercept, standardize = standardize)
   yhat <- predict(fit, x, s = lamhat)
   nz <- sum(predict(fit, s = lamhat, type = "coef") != 
              0)
-  sigma = sqrt(sum((y - yhat) ^ 2) / (length(y)))# - nz - 1))
+  den <- length(y)
+  if (df_corr) {
+    den <- den - nz
+  }
+
+  sigma = sqrt(sum((y - yhat) ^ 2) / den)
   return(list(sigmahat = sigma, df = nz))
 }
 
@@ -491,18 +538,18 @@ glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
 carve100 <- function (x, y, B = 100,
                        model.selector = lasso.cvcoef, return.nonaggr = FALSE, args.model.selector = list(intercept = TRUE, standardize = FALSE),
                        return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, FWER = FALSE, use_sigma_modwise = FALSE,
-                       args.lasso_inference = list(sigma = NA,intercept = TRUE)) {
+                       args.lasso.inference = list(sigma = NA,intercept = TRUE)) {
   B <- 1
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
   } else {
     family <- args.model.selector$family
   }
-  globalSigma <- args.lasso_inference$sigma
-  if (is.na(args.lasso_inference$sigma) && family == "gaussian") {
+  globalSigma <- args.lasso.inference$sigma
+  if (is.na(args.lasso.inference$sigma) && family == "gaussian") {
     estSigma <- estimateSigma(scale(x, T, F), scale(y, T, F), intercept = FALSE, standardize = FALSE)
     globalSigma <- estSigma$sigmahat
-    args.lasso_inference$sigma <- globalSigma
+    args.lasso.inference$sigma <- globalSigma
   }
   n <- nrow(x)
   p <- ncol(x)
@@ -604,14 +651,14 @@ carve100 <- function (x, y, B = 100,
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
         sigma_model <- sqrt(RSS / (n - p.sel))
         estSigma <- sigma_model
-        args.lasso_inference$sigma <- sigma_model
+        args.lasso.inference$sigma <- sigma_model
       }
       if (p.sel > 0) {
         if (length(beta) == p+1 && family == "gaussian") beta <- beta[-1]
         fLItry <- tryCatch_W_E(do.call(fixedLassoInf, args = c(list(x = x, y = y, beta = beta, 
                                                                     tol.beta = args.model.selector$tol.beta,
                                                                     lambda = lambda, intercept = args.model.selector$intercept),
-                                                               args.lasso_inference)), 0)
+                                                               args.lasso.inference)), 0)
         if (!is.null(fLItry$error)) {
           stop(paste(fLItry$error, "stopping carve100", sep=" "))
         } else if (!is.null(fLItry$warning)) {
@@ -700,17 +747,17 @@ multi.carve_group <- function (x, y, B = 100, fraction = 0.5,
                        model.selector = lasso.cvcoef, parallel = FALSE, ncores = getOption("mc.cores", 2L),
                        gamma = seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B), args.model.selector = list(intercept = TRUE,standardize = FALSE),
                        return.nonaggr = FALSE, return.selmodels = FALSE, repeat.max = 20, verbose = FALSE,
-                       FWER = FALSE, use_sigma_modwise = FALSE, args.lasso_inference = list(sigma = NA,intercept = TRUE), groups) {
+                       FWER = FALSE, use_sigma_modwise = FALSE, args.lasso.inference = list(sigma = NA,intercept = TRUE), groups) {
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
   } else {
     family <- args.model.selector$family
   }
-  globalSigma <- args.lasso_inference$sigma
-  if (is.na(args.lasso_inference$sigma) && family == "gaussian") {
+  globalSigma <- args.lasso.inference$sigma
+  if (is.na(args.lasso.inference$sigma) && family == "gaussian") {
     estSigma <- estimateSigma(scale(x, T, F), scale(y, T, F), intercept = FALSE, standardize = FALSE)
     globalSigma <- estSigma$sigmahat
-    args.lasso_inference$sigma <- globalSigma
+    args.lasso.inference$sigma <- globalSigma
   }
   
   n <- nrow(x)
@@ -829,13 +876,13 @@ multi.carve_group <- function (x, y, B = 100, fraction = 0.5,
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
         sigma_model <- sqrt(RSS / (n - p.sel))
         estSigma <- sigma_model
-        args.lasso_inference$sigma <- sigma_model
+        args.lasso.inference$sigma <- sigma_model
       }
       ngrouptested <- sum(unlist(lapply(lapply(groups, intersect, sel.model), length)) > 0)
       if (p.sel > 0 && ngrouptested > 0) {
         fLItry <- tryCatch_W_E(do.call(OptimalFixedLassoGroup,
                                        args = c(list(X = x, y = y,ind = split, beta = beta, tol.beta = 0, lambda = lambda,
-                                                     intercept = args.model.selector$intercept, groups = groups), args.lasso_inference)), 0)
+                                                     intercept = args.model.selector$intercept, groups = groups), args.lasso.inference)), 0)
         if (!is.null(fLItry$error)) {
           print("split again")
           print(fLItry$error)
@@ -1166,17 +1213,17 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
                                       args.classical.fit = NULL, args.classical.ci = NULL, return.nonaggr = FALSE, 
                                       return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, ci.timeout = 10,
                                       FWER = FALSE, split_pval = TRUE, ttest = TRUE, use_sigma_modwise = TRUE,
-                                      args.lasso_inference = list(sigma = NA)) {
+                                      args.lasso.inference = list(sigma = NA)) {
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
   } else {
     family <- args.model.selector$family
   }
-  globalSigma <- args.lasso_inference$sigma
-  if (is.na(args.lasso_inference$sigma) && family == "gaussian") {
+  globalSigma <- args.lasso.inference$sigma
+  if (is.na(args.lasso.inference$sigma) && family == "gaussian") {
     estSigma <- estimateSigma.1se(scale(x, T, F), scale(y, T, F), intercept = FALSE, standardize = FALSE)
     globalSigma <- estSigma$sigmahat
-    args.lasso_inference$sigma <- globalSigma
+    args.lasso.inference$sigma <- globalSigma
     if (ttest == FALSE) args.classical.fit$Sigma <-globalSigma
   }
   if (ttest && family=="gaussian") args.classical.fit$Sigma <- NA
@@ -1309,14 +1356,14 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
         sigma_model <- sqrt(RSS / (n - p.sel))
         estSigma <- sigma_model
-        args.lasso_inference$sigma <- sigma_model
+        args.lasso.inference$sigma <- sigma_model
         if (ttest == FALSE) args.classical.fit$Sigma <- sigma_model
       }
       if (p.sel > 0) {
         fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso,
                                        args = c(list(X = x, y = y,ind = split, beta = beta, tol.beta = 0,
                                                      lambda = lambda, intercept = args.model.selector$intercept,
-                                                     selected = FALSE), args.lasso_inference)), 0)
+                                                     selected = FALSE), args.lasso.inference)), 0)
         if (!is.null(fLItry$error)) {
           print("split again")
           print(fLItry$error)
