@@ -17,7 +17,6 @@ sample_truncnorm_white <- function( A, b, initial, bias_direction, how_often = 1
   # burnin : How many iterations until we start recording samples?
   # ndraw : How many samples should we return?
   # use_A : if true, some of the movement is in the constrained directions 
-  
   dims <- dim(A)
   nvar <- dims[2]
   nconstraint <- dims[1]

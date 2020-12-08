@@ -4,7 +4,7 @@
 multi.carve <- function (x, y, B = 50, fraction = 0.9,
           model.selector = lasso.cvcoef, classical.fit = lm.pval.flex,
           parallel = FALSE, ncores = getOption("mc.cores", 2L), 
-          gamma = ((1:50)/B)[((1:50)/50) >= 0.05],
+          gamma = ((1:B)/B)[((1:B)/B) >= 0.05],
           family = "gaussian",
           args.model.selector = list(intercept = TRUE, standardize = FALSE),
           se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
@@ -24,7 +24,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   # gamma: quantiles to consider, if several, additional penalty is applied
   # family: gaussian or binomial
   # args.model.selector: additional arguments for selection process
-  # args.classical.fit: additional arguments for calculatin splitting p-values
+  # args.classical.fit: additional arguments for calculating splitting p-values
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
   # verbose: whether to print key steps
