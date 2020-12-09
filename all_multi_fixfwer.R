@@ -115,7 +115,7 @@ report_sigma <- FALSE
 # SNR <-2
 # sparsity <- 10
 
-B_vec <- c(1, (1:5) * 10) # number of splits
+B_vec <- c(1, 50) # c(1, (1:5) * 10) # number of splits
 frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
 nsim <- 200
 ntasks <- nsim
@@ -190,13 +190,13 @@ for (frac in frac_vec) {
       reported_sigma <- estSigma$sigmahat
     }
 
-    mcrtry <- tryCatch_W_E(multi.carve(x, y, B = B, fraction = frac, model.selector = lasso.cvcoef,
+    mcrtry <- tryCatch_W_E(multi.carve.re(x, y, B = B, fraction = frac, model.selector = lasso.cvcoef,
                                        classical.fit = lm.pval.flex, parallel = FALSE,
-                                       ncores = getOption("mc.cores", 2L), gamma = 1, # aggregate outside to test different methods
+                                       ncores = getOption("mc.cores", 2L), # aggregate outside to test different methods
                                        args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use_lambda.min = FALSE),
-                                       args.classical.fit = list(Sigma = reported_sigma), verbose = FALSE,
+                                       args.classical.fit = list(Sigma = reported_sigma, ttest = FALSE), verbose = FALSE,
                                        FWER = FALSE, split_pval = TRUE, return.selmodels = TRUE, return.nonaggr = TRUE,
-                                       use_sigma_modwise = usei, args.lasso.inference = list(sigma = reported_sigma,
+                                       args.lasso.inference = list(sigma = reported_sigma,
                                                                                              verbose = TRUE, selected = TRUE)), 0)
     c100try <- tryCatch_W_E(carve100(x, y, model.selector = lasso.cvcoef,
                                      args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 1e-5, use_lambda.min = FALSE),
