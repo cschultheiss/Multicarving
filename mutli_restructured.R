@@ -228,10 +228,9 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
                          family = "gaussian",
                          args.model.selector = list(intercept = TRUE, standardize = FALSE),
                          se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
-                         args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE,
+                         args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE, skip.variables = TRUE,
                          verbose = FALSE, FWER = TRUE, split_pval= TRUE,
-                         use_sigma_modwise = FALSE,
-                         args.lasso.inference = list(sigma = NA)) {
+                         args.lasso.inference = list(sigma = NA, sig_Level = 0.05, FWER = FWER, aggregation = min(gamma))) {
   # routine to split the data, select a model and calculate carving p-values B times
   # x: matrix of predictors
   # y: response vector
@@ -247,10 +246,10 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
   # args.classical.fit: additional arguments for calculating splitting p-values
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
+  # skip.variables: shall carving p-values for variables selected less than min(gamma)*B times be omitted
   # verbose: whether to print key steps
   # FWER: shall a FWER correction be applied
   # split_pval: shall p-values for splitting be determined as well
-  # use_sigma_modwise: shall sigma be calculated on a per model basis
   # args.lasso.inference: additional arguments for inference after Lasso
   
   
@@ -392,6 +391,19 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
   } else {
     lapply(1:B, oneSplit_select)
   }
+  if (skip.variables){
+    myExtract.sel <- function(name) {
+      matrix(unlist(lapply(sel.out, "[[", name)), nrow = B, 
+             byrow = TRUE)
+    }
+    sel.models <- myExtract.sel("sel.models")
+    times.selected <- apply(sel.models, 2, sum)
+    which.check <- which(times.selected >= min(gamma) *B)
+    warning(paste("Reducing number of tests from", sum(sel.models), "to", sum(sel.models[, which.check])))
+  } else {
+    which.check <- NULL
+  }
+
   oneSplit_infer<- function(sel) {
     if (split_pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
@@ -430,7 +442,7 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
     }
     if (p.sel > 0) {
       fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
-                                                                      lambda = lambda, intercept = args.model.selector$intercept),
+                                                                      lambda = lambda, intercept = args.model.selector$intercept, which.check = which.check),
                                                                  args.lasso.inference)), 0)
       if (!is.null(fLItry$error)) {
         warning(paste("Failed to infer a split, due to:", fLItry$error, sep=" "))

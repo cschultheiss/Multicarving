@@ -5,7 +5,7 @@
 
 OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian",
                             intercept = TRUE, ndraw = 8000, burnin = 2000, sig_Level = 0.05,
-                            Bonferroni = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE) {
+                            FWER = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE, which.check = NULL) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -21,7 +21,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
   # ndraw and burning might be increased for high the degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
   # sig_level: level for the hypothesis test
-  # Bonferroni: whether a Bonferroni correction will be applied
+  # FWER: whether a FWER correction will be applied
   # aggregation: aggregation parameter \lambda_min
   # selected: whether to use the selected viewpoint for aggregation
   # verbose: print some key steps
@@ -159,7 +159,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
     pvalues <- numeric(s)
     ndraw0 <- ndraw
     burnin0 <- burnin
-    if (Bonferroni) {
+    if (FWER) {
       if (intercept) {
         sig_Level <- sig_Level/(s-1)
       } else {
@@ -181,6 +181,12 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
     nskipped <- 0 
     for (j in 1:s) {
       if (intercept && j == 1) next ()
+      if (!is.null(which.check)){
+        if ((intercept && !((chosen[j]-1) %in% which.check)) || (!intercept && !((chosen[j]) %in% which.check))){
+          pvalues[j] <- 1
+          next()
+        }
+      }
       if (intercept) {
         if (verbose) print(paste("Inference for", chosen[j]-1))
       } else {
@@ -458,7 +464,7 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
 
 OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian", groups,
                                    intercept = TRUE, ndraw = 8000, burnin = 2000,
-                                   sig_Level = 0.05, aggregation = 0.05, Bonferroni = TRUE, verbose = FALSE) {
+                                   sig_Level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -475,7 +481,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
   # ndraw and burning might be increased for high the degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
   # sig_level: level for the hypothesis test
-  # Bonferroni: whether a Bonferroni correction will be applied
+  # FWER: whether a FWER correction will be applied
   # aggregation: aggregation parameter \lambda_min
   # selected: whether to use the selected viewpoint for aggregation
   # verbose: print some key steps
@@ -642,7 +648,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
   } else {
     ngrouptested <- sum(unlist(lapply(lapply(groups, intersect, chosen), length)) > 0)
   }
-  if (Bonferroni) {
+  if (FWER) {
     sig_Level <- sig_Level / ngrouptested
   }
   correction_factor <- (1 - log(aggregation)) / aggregation
