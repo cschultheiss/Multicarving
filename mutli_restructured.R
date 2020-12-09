@@ -384,6 +384,14 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
     sel.models[sel.model] <- TRUE
     return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda))
   }
+  sel.out <- if (parallel) {
+    stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
+    if (verbose) 
+      cat("...starting parallelization of sample-splits\n")
+    mclapply(1:B, oneSplit_select, mc.cores = ncores)
+  } else {
+    lapply(1:B, oneSplit_select)
+  }
   oneSplit_infer<- function(sel) {
     if (split_pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
@@ -501,22 +509,21 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
     list(pvals = pvals.v, sel.models = sel.models, 
          split = split)
   }
-  split.out <- if (parallel) {
+  inf.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
       cat("...starting parallelization of sample-splits\n")
-    mclapply(1:B, oneSplit, mc.cores = ncores)
+    mclapply(sel.out, oneSplit_infer, mc.cores = ncores)
   } else {
-    lapply(1:B, function(b) {oneSplit_infer(oneSplit_select())})
-
+    lapply(sel.out, oneSplit_infer)
   }
   myExtract <- function(name) {
-    matrix(unlist(lapply(split.out, "[[", name)), nrow = B, 
+    matrix(unlist(lapply(inf.out, "[[", name)), nrow = B, 
            byrow = TRUE)
   }
   if (split_pval) { 
     ls <- list()
-    pvalsall <- array(unlist(lapply(split.out, "[[", "pvals")), dim = c(2, p, B))
+    pvalsall <- array(unlist(lapply(inf.out, "[[", "pvals")), dim = c(2, p, B))
     for (icf in  1:2) {
       pvals <- t(pvalsall[icf, , ])
       colnames(pvals) <- colnames(x)
@@ -547,7 +554,7 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
         pvals <- NA
       if (return.selmodels) {
         if (icf==2) {
-          keep <- c("return.selmodels", "x", "y", "gamma", "split.out", 
+          keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
                     "pvals", "pvals.current", "which.gamma", "sel.models","ls","icf")
           rm(list = setdiff(names(environment()), keep))
         }
@@ -581,7 +588,7 @@ multi.carve.re <- function (x, y, B = 50, fraction = 0.9,
     if (!return.nonaggr) 
       pvals <- NA
     if (return.selmodels) {
-      keep <- c("return.selmodels", "x", "y", "gamma", "split.out", 
+      keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
                 "pvals", "pvals.current", "which.gamma", "sel.models")
       rm(list = setdiff(names(environment()), keep))
     }
