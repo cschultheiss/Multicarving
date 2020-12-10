@@ -378,161 +378,10 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   }
 }
 
-
-
-
-lm.pval.flex <- function (x, y, exact = TRUE, intercept = TRUE, Sigma = NA, ttest = TRUE, ...) {
-  if (intercept) {
-    fit.lm <- lm(y ~ x, ...)
-    fit.summary <- summary(fit.lm)
-    tstat <- coef(fit.summary)[-1, "t value"]
-  } else {
-    fit.lm <- lm(y ~ -1 + x,...) 
-    fit.summary <- summary(fit.lm)
-    tstat <- coef(fit.summary)[, "t value"]
-  }
-  
-  if (is.na(Sigma) || ttest) {
-    setNames(2 * (if (exact) 
-      pt(abs(tstat), df = fit.lm$df.residual, lower.tail = FALSE)
-      else pnorm(abs(tstat), lower.tail = FALSE)), colnames(x)) 
-  } else {
-    sigma_hat<-sqrt(sum((fit.lm$residuals) ^ 2) / fit.lm$df.residual)
-    setNames(2 * pnorm(abs(tstat * sigma_hat / Sigma), lower.tail = FALSE), colnames(x))
-  }
-}
-
-pval.aggregator <- function(pval.list, gamma, cutoff = TRUE) {
-  aggregated.list <- list()
-  i <- 0
-  for (pvals in pval.list) {
-    i <- i+1
-    p <- dim(pvals)[2]
-    pvals.current <- numeric(p)
-    for (j in 1:p) {
-      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
-      penalty <- if (length(gamma) > 1) 
-        (1 - log(min(gamma)))
-      else 1
-      pvals.pre <- min(quant.gamma) * penalty
-      if (cutoff) pvals.pre <- pmin(pvals.pre, 1)
-      pvals.current[j] <- pvals.pre
-    }
-    aggregated.list[[i]] <- pvals.current
-  }
-  return(aggregated.list)
-}
-
-# different Lasso selector
-
-lasso.firstqcoef <- function (x, y, q, tol.beta = 0, return_intercept = NULL, ...) {
-  fit <- glmnet(x, y, dfmax = q,...)
-  m <- predict(fit, type = "nonzero")
-  delta <- q - unlist(lapply(m, length))
-  delta[delta < 0] <- Inf
-  take <- which.min(delta)
-  sel.model <- m[[take]]
-  lambda <- fit$lambda[take]
-  coefs <- coef(fit, s = lambda)
-  beta <- coefs[2 : (dim(x)[2] + 1)]
-  if (is.null(return_intercept)) return_intercept <- (abs(coefs[1]) > 0)
-  if (return_intercept) {
-    return_beta <- coefs[1 : (dim(x)[2] + 1)]
-  } else {
-    return_beta <- beta
-  }
-  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
-  return(list(sel.model = chosen, beta = return_beta, lambda = lambda*dim(x)[1]))
-}
-
-lasso.cvcoef<-function (x, y, nfolds = 10, grouped = nrow(x) > 3 * nfolds,
-                        tol.beta = 0, use_lambda.min = FALSE, return_intercept = NULL, ...) {
-  fit.cv <- cv.glmnet(x, y, nfolds = nfolds, grouped = grouped, thresh = 1e-7, ...)
-  if (use_lambda.min) {
-    lambda <- fit.cv$lambda.min
-  } else {
-    lambda <- fit.cv$lambda.1se
-  }
-  coefs <- coef(fit.cv,x=x,y=y,s=lambda,exact=TRUE)
-  beta <- coefs[2:(dim(x)[2]+1)]
-  if (is.null(return_intercept)) return_intercept <- (abs(coefs[1])>0)
-  if (return_intercept) {
-    return_beta <- coefs[1 : (dim(x)[2] + 1)]
-  } else {
-    return_beta <- beta
-  }
-  if (coefs[1] != 0) {
-    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) #model indices
-  } else {
-    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
-  }
-  return(list(sel.model = chosen,beta = return_beta,lambda = lambda*dim(x)[1]))
-}
-
-fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact = FALSE, ...) {
-  fit<-glmnet(x, y, alpha = 1, thresh = thresh,...)
-  if (exact) {
-    coefs <-coef(fit, s = lambda / (dim(x)[1]),x = x,
-                 y = y, exact = exact, thresh = thresh) #lambda/n1 due to different definition of the LASSO loss function 
-  } else {
-    coefs <- coef(fit, s = lambda / (dim(x)[1])) #lambda/n1 due to different definition of the LASSO loss function
-  }
-  
-  beta <- coefs[2 : (dim(x)[2] + 1)]
-  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
-  return(list(sel.model = chosen, beta = beta, lambda = lambda))
-}
-
-estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df_corr = FALSE) {
-  selectiveInference:::checkargs.xy(x, rep(0, nrow(x)))
-  if (nrow(x) < 10) 
-    stop("Number of observations must be at least 10 to run estimateSigma")
-  cvfit <- cv.glmnet(x, y, intercept = intercept, standardize = standardize)
-  lamhat <- cvfit$lambda.1se
-  if (use_lambda.min) lamhat <- cvfit$lambda.min
-  fit <- glmnet(x, y, intercept = intercept, standardize = standardize)
-  yhat <- predict(fit, x, s = lamhat)
-  nz <- sum(predict(fit, s = lamhat, type = "coef") != 
-             0)
-  den <- length(y)
-  if (df_corr) {
-    den <- den - nz
-  }
-
-  sigma = sqrt(sum((y - yhat) ^ 2) / den)
-  return(list(sigmahat = sigma, df = nz))
-}
-
-glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
-  increase <- TRUE
-  incs <- 0
-  while (increase) {
-    increase <- FALSE
-    pi.hat <- max(delta, min(1 - delta, mean(y)))
-    delta.0 <- (pi.hat * delta)/(1 + delta)
-    delta.1 <- (1 + pi.hat * delta)/(1 + delta)
-    y.tilde <- delta.0 * (1 - y) + delta.1 * y
-    pseudo.y <- cbind(y.tilde, 1 - y.tilde)
-    s <- dim(x)[2]
-    str<-paste("pseudo.y~", paste("x[,", 1:s, "]", collapse = "+"), collapse = "")
-    tryfit <- tryCatch_W_E(glm(formula = as.formula(str), family = "binomial", maxit = maxit, epsilon = epsilon), 0)
-    if ("glm.fit: fitted probabilities numerically 0 or 1 occurred" %in% tryfit$warning) {
-      delta <- 1.1*delta
-      incs <- incs+1
-      increase <- TRUE
-      if (delta > 0.1) break("Increased delta too much without succes")
-    } else {
-      fit <- tryfit$value
-    }
-  }
-  if (incs>0) warning(paste("Increased delta to ", delta))
-  return(glm.pval(x, pseudo.y,maxit = maxit, epsilon = epsilon))
-}
-
 carve100 <- function (x, y, B = 100,
-                       model.selector = lasso.cvcoef, return.nonaggr = FALSE, args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                       return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, FWER = FALSE, use_sigma_modwise = FALSE,
-                       args.lasso.inference = list(sigma = NA,intercept = TRUE)) {
+                      model.selector = lasso.cvcoef, return.nonaggr = FALSE, args.model.selector = list(intercept = TRUE, standardize = FALSE),
+                      return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, FWER = FALSE, use_sigma_modwise = FALSE,
+                      args.lasso.inference = list(sigma = NA,intercept = TRUE)) {
   B <- 1
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
@@ -612,8 +461,8 @@ carve100 <- function (x, y, B = 100,
             coefs <- coef(fit, x = x,y = y, s = lambda / n, exact = TRUE, standardize = args.model.selector$standardize,
                           intercept = args.model.selector$intercept, thresh = threshn, family = family)
             beta <- coefs[-1]
-  
-           if (args.model.selector$intercept) {
+            
+            if (args.model.selector$intercept) {
               sel.model <- which(abs(beta) > args.model.selector$tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2))) #model indices
             } else {
               sel.model <- which(abs(beta) > args.model.selector$tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
@@ -727,7 +576,7 @@ carve100 <- function (x, y, B = 100,
   else {
     sel.models <- NA
   }
-
+  
   if (return.selmodels) {
     keep <- c("return.selmodels", "x", "y", 
               "pvals", "sel.models")
@@ -738,10 +587,10 @@ carve100 <- function (x, y, B = 100,
 }
 
 multi.carve_group <- function (x, y, B = 100, fraction = 0.5, 
-                       model.selector = lasso.cvcoef, parallel = FALSE, ncores = getOption("mc.cores", 2L),
-                       gamma = seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B), args.model.selector = list(intercept = TRUE,standardize = FALSE),
-                       return.nonaggr = FALSE, return.selmodels = FALSE, repeat.max = 20, verbose = FALSE,
-                       FWER = FALSE, use_sigma_modwise = FALSE, args.lasso.inference = list(sigma = NA,intercept = TRUE), groups) {
+                               model.selector = lasso.cvcoef, parallel = FALSE, ncores = getOption("mc.cores", 2L),
+                               gamma = seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B), args.model.selector = list(intercept = TRUE,standardize = FALSE),
+                               return.nonaggr = FALSE, return.selmodels = FALSE, repeat.max = 20, verbose = FALSE,
+                               FWER = FALSE, use_sigma_modwise = FALSE, args.lasso.inference = list(sigma = NA,intercept = TRUE), groups) {
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
   } else {
@@ -844,7 +693,7 @@ multi.carve_group <- function (x, y, B = 100, fraction = 0.5,
         p.sel <- length(sel.model)
         if (args.model.selector$intercept) {
           if ((p.sel > 1 && (rankMatrix(cbind(rep(1, n.left), x.left[, sel.model]))[[1]] < (p.sel + 1) ||
-                            (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[, sel.model]))[[1]] < (p.sel + 1)))) ||
+                             (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[, sel.model]))[[1]] < (p.sel + 1)))) ||
               fit_again) split_again <- TRUE
         } else {
           if ((p.sel > 1 && (rankMatrix(x.left[, sel.model])[[1]] < (p.sel) ||
@@ -918,7 +767,7 @@ multi.carve_group <- function (x, y, B = 100, fraction = 0.5,
               sel.pval1 <- pmin(sel.pval1, 1) #for FCR
             }
             pvals.v <- sel.pval1
-
+            
             if (return.selmodels) 
               sel.models[sel.model] <- TRUE
             try.again <- FALSE
@@ -987,227 +836,14 @@ multi.carve_group <- function (x, y, B = 100, fraction = 0.5,
                  sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
 }
 
-
-aggregate.ci.saturated <- function(vlo, vup, centers, ses, gamma.min, multi.corr = FALSE,
-                                   verbose = FALSE, var, s0, ci.level, timeout = 10) {
-  inf.ci <- is.infinite(vlo) & is.infinite(vup)
-  no.inf.ci <- sum(inf.ci)
-  B <- length(vlo)
-  if (verbose) {
-    cat("number of Inf ci:", no.inf.ci, "\n")
-  }
-  if ((no.inf.ci == B) || (no.inf.ci > (1 - gamma.min) * 
-                                     B)) {
-    return(c(-Inf, Inf))
-  }
-  vlo <- vlo[!inf.ci]
-  vup <- vup[!inf.ci]
-  centers <- centers[!inf.ci]
-  ses <- ses[!inf.ci]
-  s0 <- s0[!inf.ci]
-  ci.info <- list(vlo = vlo, vup = vup, centers = centers, 
-                  no.inf.ci = no.inf.ci, ses = ses, 
-                  s0 = s0,  gamma.min = gamma.min, multi.corr = multi.corr, 
-                  ci.level = ci.level)
-  inner <- find.inside.point.gammamin.saturated(low = min(centers), high = max(centers), 
-                                      ci.info = ci.info, verbose = verbose)
-
-  outer <- min(vlo[is.finite(vlo)])
-  newboundstry <- tryCatch_W_E(find.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer,
-                                                                        ci.info = ci.info, verbose = verbose, timeout = timeout), NA)
-  if (!is.null(newboundstry$error)) {
-    warning(paste(newboundstry$error, " setting lower interval limit to -Inf for variable ", var))
-    l.bound  <- -Inf
-  } else {
-    new.bounds <- newboundstry$value
-    inner <- new.bounds$shouldcover
-    outer <- new.bounds$shouldnotcover
-    
-    l.bound <- bisection.gammamin.coverage.saturated(outer = outer, inner = inner, 
-                                                     ci.info = ci.info, verbose = verbose)
-  }
-
-  if (verbose) {
-    cat("lower bound ci aggregated is", l.bound, "\n")
-  }
-  outer <- max(vup[is.finite(vup)])
-  newboundstry <- tryCatch_W_E(find.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer, 
-                                                                        ci.info = ci.info, verbose = verbose, timeout=timeout), NA)
-  if (!is.null(newboundstry$error)) {
-    warning(paste(newboundstry$error, " setting upper interval limit to Inf for variable ", var))
-    u.bound  <- Inf
-  } else {
-    new.bounds <- newboundstry$value
-    inner <- new.bounds$shouldcover
-    outer <- new.bounds$shouldnotcover
-    u.bound <- bisection.gammamin.coverage.saturated(inner = inner, outer = outer, 
-                                                     ci.info = ci.info, verbose = verbose)
-  }
-
-  if (verbose) {
-    cat("upper bound ci aggregated is", u.bound, "\n")
-  }
-  return(c(l.bound, u.bound))
-}
-
-find.inside.point.gammamin.saturated <- function (low, high, ci.info, verbose) {
-  range.length <- 10
-  test.range <- seq(low, high, length.out = range.length)
-  cover <- mapply(does.it.cover.gammamin.saturated, beta.j = test.range, 
-                  ci.info = list(ci.info = ci.info))
-  while (!any(cover)) {
-    range.length <- 10 * range.length
-    test.range <- seq(low, high, length.out = range.length)
-    cover <- mapply(does.it.cover.gammamin.saturated, beta.j = test.range, 
-                    ci.info = list(ci.info = ci.info))
-    if (range.length > 10^3) {
-      message("FOUND NO INSIDE POINT")
-      message("number of splits")
-      message(length(ci.info$centers))
-      message("centers")
-      message(ci.info$centers)
-      message("ses")
-      message(ci.info$ses)
-      stop("couldn't find an inside point between low and high. The confidence interval doesn't exist!")
-    }
-  }
-  if (verbose) {
-    cat("Found an inside point at granularity of", 
-        range.length, "\n")
-  }
-  min(test.range[cover])
-}
-
-does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
-  if (missing(ci.info)) 
-    stop("ci.info is missing to the function does.it.cover.gammamin")
-  centers <- ci.info$centers
-  npv <- length(centers)
-  no.inf.ci <- ci.info$no.inf.ci
-  ses <- ci.info$ses
-  vlo <- ci.info$vlo
-  vup <- ci.info$vup
-  gamma.min <- ci.info$gamma.min
-  multi.corr <- ci.info$multi.corr
-  s0 <- ci.info$s0
-  alpha <- 1 - ci.info$ci.level
-  pvals <- numeric(npv)
-  for (i in 1:npv) {
-    pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i])
-    if (pvals[i] == 0 || pvals[i] == 1 || is.na(pvals[i])) {
-      pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i], bits = 2)
-      if (is.na(pvals[i])) pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i], bits = 100)
-    } 
-  }
-  if (any(is.na(pvals))) stop("At least one p-value is NA")
-  pvals <- pmin(pvals, 1-pvals)
-  pval.rank <- rank(pvals, ties.method = "first")
-  nsplit <- length(pval.rank) + no.inf.ci
-  gamma.b <- pval.rank / nsplit
-
-  if (multi.corr) {
-    if (any(is.na(s0))) 
-      stop("need s0 information to be able to create multiple testing corrected pvalues")
-    level <- (1 - alpha * gamma.b / (1 - log(gamma.min) * s0))
-  } else {
-    level <- (1 - alpha * gamma.b / (1 - log(gamma.min)))
-  }
-
-  if (all(gamma.b < gamma.min)) {
-    return(TRUE)
-  } else {
-    level <- 1-level
-    coveredpre <- all(level[gamma.b >= gamma.min] < 2 * pvals[gamma.b >= gamma.min])
-    return(coveredpre)
-  }
-}
-
-find.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose, timeout = 10) {
-  reset.shouldnotcover <- FALSE
-  if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
-    reset.shouldnotcover <- TRUE
-    if (verbose) 
-      cat("finding a new shouldnotcover bound\n")
-    start_user_time <- proc.time()[["elapsed"]]
-    i <- 0
-    while (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, 
-                                            ci.info = ci.info)) {
-      i <- i + 1
-      old <- shouldnotcover
-      shouldnotcover <- shouldnotcover + i * (shouldnotcover - shouldcover)
-      shouldcover <- old
-      if ((proc.time()[["elapsed"]] - start_user_time) > timeout) 
-        stop(paste("Searched outside point for more than ", timeout, " seconds, reached ", shouldnotcover))
-    }
-    if (verbose) {
-      cat("new\n")
-      cat("shouldnotcover", shouldnotcover, "\n")
-      cat("shouldcover", shouldcover, "\n")
-    }
-  }
-  if (!does.it.cover.gammamin.saturated(beta.j = shouldcover, ci.info = ci.info)) {
-    if (reset.shouldnotcover) 
-      stop("Problem: we first reset shouldnotcover and are now resetting shouldcover, this is not supposed to happen")
-    if (verbose) 
-      cat("finding a new shouldcover bound\n")
-    while (!does.it.cover.gammamin.saturated(beta.j = shouldcover, 
-                                   ci.info = ci.info)) {
-      old <- shouldcover
-      shouldcover <- shouldcover + (shouldcover - shouldnotcover)
-      shouldnotcover <- old
-    }
-    if (verbose) {
-      cat("new\n")
-      cat("shouldnotcover", shouldnotcover, "\n")
-      cat("shouldcover", shouldcover, "\n")
-    }
-  }
-  return(list(shouldcover = shouldcover, shouldnotcover = shouldnotcover))
-}
-
-bisection.gammamin.coverage.saturated <- function (outer, inner, ci.info, verbose, eps.bound = 10 ^ (-7)) {
-  check.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer, 
-                                  ci.info = ci.info, verbose = verbose)
-  eps <- 1
-  while (eps > eps.bound) {
-    middle <- (outer + inner)/2
-    if (does.it.cover.gammamin.saturated(beta.j = middle, ci.info = ci.info)) {
-      inner <- middle
-    } else {
-      outer <- middle
-    }
-    eps <- abs(inner - outer)
-  }
-  solution <- (inner + outer)/2
-  if (verbose) {
-    cat("finished bisection...eps is", eps, "\n")
-  }
-  return(solution)
-}
-
-check.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose) {
-  if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
-    stop("shouldnotcover bound is covered! we need to decrease it even more! (PLZ implement)")
-  } else {
-    if (verbose) 
-      cat("shouldnotcover bound is not covered, this is good")
-  }
-  if (does.it.cover.gammamin.saturated(beta.j = shouldcover, ci.info = ci.info)) {
-    if (verbose) 
-      cat("shouldcover is covered!, It is a good covered bound")
-  } else {
-    stop("shouldcover is a bad covered bound, it is not covered!")
-  }
-}
-
 multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0.95, model.selector = lasso.cvcoef,
-                                      classical.fit = lm.pval, parallel = FALSE, ncores = getOption("mc.cores", 2L),
-                                      gamma = seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B),
-                                      args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                                      args.classical.fit = NULL, args.classical.ci = NULL, return.nonaggr = FALSE, 
-                                      return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, ci.timeout = 10,
-                                      FWER = FALSE, split_pval = TRUE, ttest = TRUE, use_sigma_modwise = TRUE,
-                                      args.lasso.inference = list(sigma = NA)) {
+                                     classical.fit = lm.pval, parallel = FALSE, ncores = getOption("mc.cores", 2L),
+                                     gamma = seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B),
+                                     args.model.selector = list(intercept = TRUE, standardize = FALSE),
+                                     args.classical.fit = NULL, args.classical.ci = NULL, return.nonaggr = FALSE, 
+                                     return.selmodels = FALSE, repeat.max = 20, verbose = FALSE, ci.timeout = 10,
+                                     FWER = FALSE, split_pval = TRUE, ttest = TRUE, use_sigma_modwise = TRUE,
+                                     args.lasso.inference = list(sigma = NA)) {
   if (is.null(args.model.selector$family)) {
     family <- "gaussian"
   } else {
@@ -1231,7 +867,7 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
     if (split_pval) {
       pvals.v <- matrix(1, nrow=2, ncol=p)
     } else {
-    pvals.v <- rep(1, p)
+      pvals.v <- rep(1, p)
     }
     sel.models <- logical(p)
     vlo.v <- rep(-Inf, p)
@@ -1454,13 +1090,13 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
                 sescarve.v[sel.model] <- sel.sescarve
               }
             } else {
-            pvals.v[sel.model] <- sel.pval1
-            vlo.v[sel.model] <- sel.vlo
-            vup.v[sel.model] <- sel.vup
-            estimates.v[sel.model] <- sel.estimates
-            sescarve.v[sel.model] <- sel.sescarve
+              pvals.v[sel.model] <- sel.pval1
+              vlo.v[sel.model] <- sel.vlo
+              vup.v[sel.model] <- sel.vup
+              estimates.v[sel.model] <- sel.estimates
+              sescarve.v[sel.model] <- sel.sescarve
             }
-          
+            
             if (return.selmodels) 
               sel.models[sel.model] <- TRUE
             try.again <- FALSE
@@ -1499,7 +1135,7 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
   myExtract <- function(name) {
     matrix(unlist(lapply(split.out, "[[", name)), nrow = B, 
            byrow = TRUE)
-    }
+  }
   if (split_pval) { 
     ls <- list()
     pvalsall <- array(unlist(lapply(split.out, "[[", "pvals")), dim = c(2, p, B))
@@ -1524,7 +1160,7 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
         centers <- myExtract("centers")
         ses <- myExtract("ses")
       }
-
+      
       df.res <- unlist(lapply(split.out, `[[`, "df.res"))
       pvals.current <- which.gamma <- numeric(p)
       for (j in 1:p) {
@@ -1563,7 +1199,7 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
       lci.current <- t(new.ci)[, 1]
       uci.current <- t(new.ci)[, 2]
       names(lci.current) <- names(uci.current) <- names(pvals.current)
-
+      
       if (!return.nonaggr)
         pvals <- NA
       if (return.selmodels) {
@@ -1577,14 +1213,14 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
       }
       if (icf == 1) {
         ls[[icf]] <- structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                       ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve,
-                       uci = uci.current, gamma.min = gamma[which.gamma], 
-                       sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                                    ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve,
+                                    uci = uci.current, gamma.min = gamma[which.gamma], 
+                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
       } else {
         ls[[icf]] <- structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals,
-                                 ci.level = ci.level, lci =  lci.current, ses=ses,
-                                 uci = uci.current, gamma.min = gamma[which.gamma],
-                                 sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                                    ci.level = ci.level, lci =  lci.current, ses=ses,
+                                    uci = uci.current, gamma.min = gamma[which.gamma],
+                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
       }
     }
     return(ls)
@@ -1639,6 +1275,375 @@ multi.carve.ci.saturated <- function(x, y, B = 100, fraction = 0.5, ci.level = 0
                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
   }
 }
+
+
+
+pval.aggregator <- function(pval.list, gamma, cutoff = TRUE) {
+  aggregated.list <- list()
+  i <- 0
+  for (pvals in pval.list) {
+    i <- i+1
+    p <- dim(pvals)[2]
+    pvals.current <- numeric(p)
+    for (j in 1:p) {
+      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
+      penalty <- if (length(gamma) > 1) 
+        (1 - log(min(gamma)))
+      else 1
+      pvals.pre <- min(quant.gamma) * penalty
+      if (cutoff) pvals.pre <- pmin(pvals.pre, 1)
+      pvals.current[j] <- pvals.pre
+    }
+    aggregated.list[[i]] <- pvals.current
+  }
+  return(aggregated.list)
+}
+
+# different Lasso selector
+
+lasso.firstqcoef <- function (x, y, q, tol.beta = 0, return_intercept = NULL, ...) {
+  fit <- glmnet(x, y, dfmax = q,...)
+  m <- predict(fit, type = "nonzero")
+  delta <- q - unlist(lapply(m, length))
+  delta[delta < 0] <- Inf
+  take <- which.min(delta)
+  sel.model <- m[[take]]
+  lambda <- fit$lambda[take]
+  coefs <- coef(fit, s = lambda)
+  beta <- coefs[2 : (dim(x)[2] + 1)]
+  if (is.null(return_intercept)) return_intercept <- (abs(coefs[1]) > 0)
+  if (return_intercept) {
+    return_beta <- coefs[1 : (dim(x)[2] + 1)]
+  } else {
+    return_beta <- beta
+  }
+  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
+  return(list(sel.model = chosen, beta = return_beta, lambda = lambda * dim(x)[1]))
+}
+
+lasso.cvcoef<-function (x, y, nfolds = 10, grouped = nrow(x) > 3 * nfolds,
+                        tol.beta = 0, use_lambda.min = FALSE, return_intercept = NULL, ...) {
+  fit.cv <- cv.glmnet(x, y, nfolds = nfolds, grouped = grouped, thresh = 1e-7, ...)
+  if (use_lambda.min) {
+    lambda <- fit.cv$lambda.min
+  } else {
+    lambda <- fit.cv$lambda.1se
+  }
+  coefs <- coef(fit.cv,x=x,y=y,s=lambda,exact=TRUE)
+  beta <- coefs[2:(dim(x)[2]+1)]
+  if (is.null(return_intercept)) return_intercept <- (abs(coefs[1])>0)
+  if (return_intercept) {
+    return_beta <- coefs[1 : (dim(x)[2] + 1)]
+  } else {
+    return_beta <- beta
+  }
+  if (coefs[1] != 0) {
+    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+  } else {
+    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
+  }
+  return(list(sel.model = chosen,beta = return_beta,lambda = lambda * dim(x)[1]))
+}
+
+fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact = FALSE, ...) {
+  fit<-glmnet(x, y, alpha = 1, thresh = thresh,...)
+  if (exact) {
+    coefs <-coef(fit, s = lambda / (dim(x)[1]),x = x,
+                 y = y, exact = exact, thresh = thresh) # lambda/n1 due to different definition of the LASSO loss function 
+  } else {
+    coefs <- coef(fit, s = lambda / (dim(x)[1])) # lambda/n1 due to different definition of the LASSO loss function
+  }
+  
+  beta <- coefs[2 : (dim(x)[2] + 1)]
+  if (coefs[1] != 0) {
+    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+  } else {
+    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
+  }
+  return(list(sel.model = chosen, beta = beta, lambda = lambda))
+}
+
+estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df_corr = FALSE) {
+  selectiveInference:::checkargs.xy(x, rep(0, nrow(x)))
+  if (nrow(x) < 10) 
+    stop("Number of observations must be at least 10 to run estimateSigma")
+  cvfit <- cv.glmnet(x, y, intercept = intercept, standardize = standardize)
+  lamhat <- cvfit$lambda.1se
+  if (use_lambda.min) lamhat <- cvfit$lambda.min
+  fit <- glmnet(x, y, intercept = intercept, standardize = standardize)
+  yhat <- predict(fit, x, s = lamhat)
+  nz <- sum(predict(fit, s = lamhat, type = "coef") != 
+             0)
+  den <- length(y)
+  if (df_corr) {
+    den <- den - nz
+  }
+
+  sigma = sqrt(sum((y - yhat) ^ 2) / den)
+  return(list(sigmahat = sigma, df = nz))
+}
+
+lm.pval.flex <- function (x, y, exact = TRUE, intercept = TRUE, Sigma = NA, ttest = TRUE, ...) {
+  if (intercept) {
+    fit.lm <- lm(y ~ x, ...)
+    fit.summary <- summary(fit.lm)
+    tstat <- coef(fit.summary)[-1, "t value"]
+  } else {
+    fit.lm <- lm(y ~ -1 + x,...) 
+    fit.summary <- summary(fit.lm)
+    tstat <- coef(fit.summary)[, "t value"]
+  }
+  
+  if (is.na(Sigma) || ttest) {
+    setNames(2 * (if (exact) 
+      pt(abs(tstat), df = fit.lm$df.residual, lower.tail = FALSE)
+      else pnorm(abs(tstat), lower.tail = FALSE)), colnames(x)) 
+  } else {
+    sigma_hat<-sqrt(sum((fit.lm$residuals) ^ 2) / fit.lm$df.residual)
+    setNames(2 * pnorm(abs(tstat * sigma_hat / Sigma), lower.tail = FALSE), colnames(x))
+  }
+}
+
+glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
+  increase <- TRUE
+  incs <- 0
+  while (increase) {
+    increase <- FALSE
+    pi.hat <- max(delta, min(1 - delta, mean(y)))
+    delta.0 <- (pi.hat * delta)/(1 + delta)
+    delta.1 <- (1 + pi.hat * delta)/(1 + delta)
+    y.tilde <- delta.0 * (1 - y) + delta.1 * y
+    pseudo.y <- cbind(y.tilde, 1 - y.tilde)
+    s <- dim(x)[2]
+    str<-paste("pseudo.y~", paste("x[,", 1:s, "]", collapse = "+"), collapse = "")
+    tryfit <- tryCatch_W_E(glm(formula = as.formula(str), family = "binomial", maxit = maxit, epsilon = epsilon), 0)
+    if ("glm.fit: fitted probabilities numerically 0 or 1 occurred" %in% tryfit$warning) {
+      delta <- 1.1*delta
+      incs <- incs+1
+      increase <- TRUE
+      if (delta > 0.1) break("Increased delta too much without succes")
+    } else {
+      fit <- tryfit$value
+    }
+  }
+  if (incs>0) warning(paste("Increased delta to ", delta))
+  return(glm.pval(x, pseudo.y,maxit = maxit, epsilon = epsilon))
+}
+
+
+
+aggregate.ci.saturated <- function(vlo, vup, centers, ses, gamma.min, multi.corr = FALSE,
+                                   verbose = FALSE, var, s0, ci.level, timeout = 10) {
+  inf.ci <- is.infinite(vlo) & is.infinite(vup)
+  no.inf.ci <- sum(inf.ci)
+  B <- length(vlo)
+  if (verbose) {
+    cat("number of Inf ci:", no.inf.ci, "\n")
+  }
+  if ((no.inf.ci == B) || (no.inf.ci > (1 - gamma.min) * 
+                                     B)) {
+    return(c(-Inf, Inf))
+  }
+  vlo <- vlo[!inf.ci]
+  vup <- vup[!inf.ci]
+  centers <- centers[!inf.ci]
+  ses <- ses[!inf.ci]
+  s0 <- s0[!inf.ci]
+  ci.info <- list(vlo = vlo, vup = vup, centers = centers, 
+                  no.inf.ci = no.inf.ci, ses = ses, 
+                  s0 = s0,  gamma.min = gamma.min, multi.corr = multi.corr, 
+                  ci.level = ci.level)
+  inner <- find.inside.point.gammamin.saturated(low = min(centers), high = max(centers), 
+                                      ci.info = ci.info, verbose = verbose)
+
+  outer <- min(vlo[is.finite(vlo)])
+  newboundstry <- tryCatch_W_E(find.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer,
+                                                                        ci.info = ci.info, verbose = verbose, timeout = timeout), NA)
+  if (!is.null(newboundstry$error)) {
+    warning(paste(newboundstry$error, " setting lower interval limit to -Inf for variable ", var))
+    l.bound  <- -Inf
+  } else {
+    new.bounds <- newboundstry$value
+    inner <- new.bounds$shouldcover
+    outer <- new.bounds$shouldnotcover
+    
+    l.bound <- bisection.gammamin.coverage.saturated(outer = outer, inner = inner, 
+                                                     ci.info = ci.info, verbose = verbose)
+  }
+
+  if (verbose) {
+    cat("lower bound ci aggregated is", l.bound, "\n")
+  }
+  outer <- max(vup[is.finite(vup)])
+  newboundstry <- tryCatch_W_E(find.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer, 
+                                                                        ci.info = ci.info, verbose = verbose, timeout=timeout), NA)
+  if (!is.null(newboundstry$error)) {
+    warning(paste(newboundstry$error, " setting upper interval limit to Inf for variable ", var))
+    u.bound  <- Inf
+  } else {
+    new.bounds <- newboundstry$value
+    inner <- new.bounds$shouldcover
+    outer <- new.bounds$shouldnotcover
+    u.bound <- bisection.gammamin.coverage.saturated(inner = inner, outer = outer, 
+                                                     ci.info = ci.info, verbose = verbose)
+  }
+
+  if (verbose) {
+    cat("upper bound ci aggregated is", u.bound, "\n")
+  }
+  return(c(l.bound, u.bound))
+}
+
+find.inside.point.gammamin.saturated <- function (low, high, ci.info, verbose) {
+  range.length <- 10
+  test.range <- seq(low, high, length.out = range.length)
+  cover <- mapply(does.it.cover.gammamin.saturated, beta.j = test.range, 
+                  ci.info = list(ci.info = ci.info))
+  while (!any(cover)) {
+    range.length <- 10 * range.length
+    test.range <- seq(low, high, length.out = range.length)
+    cover <- mapply(does.it.cover.gammamin.saturated, beta.j = test.range, 
+                    ci.info = list(ci.info = ci.info))
+    if (range.length > 10^3) {
+      message("FOUND NO INSIDE POINT")
+      message("number of splits")
+      message(length(ci.info$centers))
+      message("centers")
+      message(ci.info$centers)
+      message("ses")
+      message(ci.info$ses)
+      stop("couldn't find an inside point between low and high. The confidence interval doesn't exist!")
+    }
+  }
+  if (verbose) {
+    cat("Found an inside point at granularity of", 
+        range.length, "\n")
+  }
+  min(test.range[cover])
+}
+
+does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
+  if (missing(ci.info)) 
+    stop("ci.info is missing to the function does.it.cover.gammamin")
+  centers <- ci.info$centers
+  npv <- length(centers)
+  no.inf.ci <- ci.info$no.inf.ci
+  ses <- ci.info$ses
+  vlo <- ci.info$vlo
+  vup <- ci.info$vup
+  gamma.min <- ci.info$gamma.min
+  multi.corr <- ci.info$multi.corr
+  s0 <- ci.info$s0
+  alpha <- 1 - ci.info$ci.level
+  pvals <- numeric(npv)
+  for (i in 1:npv) {
+    pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i])
+    if (pvals[i] == 0 || pvals[i] == 1 || is.na(pvals[i])) {
+      pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i], bits = 2)
+      if (is.na(pvals[i])) pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i], bits = 100)
+    } 
+  }
+  if (any(is.na(pvals))) stop("At least one p-value is NA")
+  pvals <- pmin(pvals, 1-pvals)
+  pval.rank <- rank(pvals, ties.method = "first")
+  nsplit <- length(pval.rank) + no.inf.ci
+  gamma.b <- pval.rank / nsplit
+
+  if (multi.corr) {
+    if (any(is.na(s0))) 
+      stop("need s0 information to be able to create multiple testing corrected pvalues")
+    level <- (1 - alpha * gamma.b / (1 - log(gamma.min) * s0))
+  } else {
+    level <- (1 - alpha * gamma.b / (1 - log(gamma.min)))
+  }
+
+  if (all(gamma.b < gamma.min)) {
+    return(TRUE)
+  } else {
+    level <- 1-level
+    coveredpre <- all(level[gamma.b >= gamma.min] < 2 * pvals[gamma.b >= gamma.min])
+    return(coveredpre)
+  }
+}
+
+find.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose, timeout = 10) {
+  reset.shouldnotcover <- FALSE
+  if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
+    reset.shouldnotcover <- TRUE
+    if (verbose) 
+      cat("finding a new shouldnotcover bound\n")
+    start_user_time <- proc.time()[["elapsed"]]
+    i <- 0
+    while (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, 
+                                            ci.info = ci.info)) {
+      i <- i + 1
+      old <- shouldnotcover
+      shouldnotcover <- shouldnotcover + i * (shouldnotcover - shouldcover)
+      shouldcover <- old
+      if ((proc.time()[["elapsed"]] - start_user_time) > timeout) 
+        stop(paste("Searched outside point for more than ", timeout, " seconds, reached ", shouldnotcover))
+    }
+    if (verbose) {
+      cat("new\n")
+      cat("shouldnotcover", shouldnotcover, "\n")
+      cat("shouldcover", shouldcover, "\n")
+    }
+  }
+  if (!does.it.cover.gammamin.saturated(beta.j = shouldcover, ci.info = ci.info)) {
+    if (reset.shouldnotcover) 
+      stop("Problem: we first reset shouldnotcover and are now resetting shouldcover, this is not supposed to happen")
+    if (verbose) 
+      cat("finding a new shouldcover bound\n")
+    while (!does.it.cover.gammamin.saturated(beta.j = shouldcover, 
+                                   ci.info = ci.info)) {
+      old <- shouldcover
+      shouldcover <- shouldcover + (shouldcover - shouldnotcover)
+      shouldnotcover <- old
+    }
+    if (verbose) {
+      cat("new\n")
+      cat("shouldnotcover", shouldnotcover, "\n")
+      cat("shouldcover", shouldcover, "\n")
+    }
+  }
+  return(list(shouldcover = shouldcover, shouldnotcover = shouldnotcover))
+}
+
+bisection.gammamin.coverage.saturated <- function (outer, inner, ci.info, verbose, eps.bound = 10 ^ (-7)) {
+  check.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer, 
+                                  ci.info = ci.info, verbose = verbose)
+  eps <- 1
+  while (eps > eps.bound) {
+    middle <- (outer + inner)/2
+    if (does.it.cover.gammamin.saturated(beta.j = middle, ci.info = ci.info)) {
+      inner <- middle
+    } else {
+      outer <- middle
+    }
+    eps <- abs(inner - outer)
+  }
+  solution <- (inner + outer)/2
+  if (verbose) {
+    cat("finished bisection...eps is", eps, "\n")
+  }
+  return(solution)
+}
+
+check.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose) {
+  if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
+    stop("shouldnotcover bound is covered! we need to decrease it even more! (PLZ implement)")
+  } else {
+    if (verbose) 
+      cat("shouldnotcover bound is not covered, this is good")
+  }
+  if (does.it.cover.gammamin.saturated(beta.j = shouldcover, ci.info = ci.info)) {
+    if (verbose) 
+      cat("shouldcover is covered!, It is a good covered bound")
+  } else {
+    stop("shouldcover is a bad covered bound, it is not covered!")
+  }
+}
+
 
 pval.creator <- function(beta, gamma, vlo, vup, centers, ses, s0 = NA, multi.corr = FALSE) {
   B <- length(centers)
