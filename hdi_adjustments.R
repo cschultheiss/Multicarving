@@ -2,16 +2,15 @@
 # making the applicable to multicarving
 
 multi.carve <- function (x, y, B = 50, fraction = 0.9,
-          model.selector = lasso.cvcoef, classical.fit = lm.pval.flex,
-          parallel = FALSE, ncores = getOption("mc.cores", 2L), 
-          gamma = ((1:B)/B)[((1:B)/B) >= 0.05],
-          family = "gaussian",
-          args.model.selector = list(intercept = TRUE, standardize = FALSE),
-          se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
-          args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE,
-          verbose = FALSE, FWER = TRUE, split_pval= TRUE,
-          use_sigma_modwise = FALSE,
-          args.lasso.inference = list(sigma = NA)) {
+                            model.selector = lasso.cvcoef, classical.fit = lm.pval.flex,
+                            parallel = FALSE, ncores = getOption("mc.cores", 2L), 
+                            gamma = ((1:B)/B)[((1:B)/B) >= 0.05],
+                            family = "gaussian",
+                            args.model.selector = list(intercept = TRUE, standardize = FALSE),
+                            se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
+                            args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE, skip.variables = TRUE,
+                            verbose = FALSE, FWER = TRUE, split_pval= TRUE,
+                            args.lasso.inference = list(sigma = NA, sig_Level = 0.05, FWER = FWER, aggregation = min(gamma))) {
   # routine to split the data, select a model and calculate carving p-values B times
   # x: matrix of predictors
   # y: response vector
@@ -27,10 +26,10 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   # args.classical.fit: additional arguments for calculating splitting p-values
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
+  # skip.variables: shall carving p-values for variables selected less than min(gamma)*B times be omitted
   # verbose: whether to print key steps
   # FWER: shall a FWER correction be applied
   # split_pval: shall p-values for splitting be determined as well
-  # use_sigma_modwise: shall sigma be calculated on a per model basis
   # args.lasso.inference: additional arguments for inference after Lasso
   
   
@@ -44,7 +43,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         use_lambda.min = TRUE
       }
       estSigma <- do.call(estimateSigma.flex,
-                         args = c(list(x = x, y = y, use_lambda.min = use_lambda.min), args.se.estimator))
+                          args = c(list(x = x, y = y, use_lambda.min = use_lambda.min), args.se.estimator))
       globalSigma <- estSigma$sigmahat
       args.lasso.inference$sigma <- globalSigma
       args.classical.fit$Sigma <- globalSigma
@@ -55,255 +54,268 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       args.classical.fit$Sigma <- globalSigma
     }
   }
-
+  
   n <- nrow(x)
   p <- ncol(x)
   n.left <- floor(n * fraction)
   n.right <- n - n.left
   stopifnot(n.left >= 1, n.right >= 0)
-  oneSplit <- function(b) {
+  oneSplit_select <- function(b) {
+    sel.models <- logical(p)
+    try.again <- TRUE
+    fLI_error <- 0L
+    split_count <- 0
+    thresh_count <- 0L
+    threshn <- 1e-7
+    fLI_problem <- TRUE
+    continue <- TRUE
+    split_again <- TRUE
+    while (split_again) {
+      split_again <- FALSE
+      split <- sample.int(n, size = n.left)
+      x.left <- x[split, ]
+      y.left <- y[split]
+      x.right <- x[-split, ]
+      y.right <- y[-split]
+      
+      output <- do.call(model.selector, args = c(list(x = x.left, 
+                                                      y = y.left), args.model.selector))
+      sel.model <- output$sel.model
+      beta <- output$beta
+      lambda <- output$lambda
+      
+      fit_again <- TRUE
+      thresh_count <- 0
+      p.sel <- length(sel.model)
+      # for empty model, active constraints are trivially fulfilled
+      if (p.sel == 0) fit_again <- FALSE
+      
+      while (fit_again) {
+        fit_again <- FALSE
+        checktry <- tryCatch_W_E(constraint_checker(x.left, y.left, beta, 0, lambda,
+                                                    family, intercept = args.model.selector$intercept), TRUE)
+        if (is.null(checktry$error)) {
+          check <- checktry$value
+        } else {
+          # if run into numerical instability when checking constraints
+          check <- TRUE
+          split_again <- TRUE
+          warning(paste(checktry$error, p.sel, " variables selected with ",
+                        n.left, "data points, splitting again"))
+        }
+        if (!check) {
+          if (verbose) 
+            cat("......fit again...\n")
+          fit_again <- TRUE
+          thresh_count <- thresh_count + 1
+          if (thresh_count > 2) {
+            warning("Giving up reducing threshhold")
+            break()
+          }
+          threshn <- 1e-7 / (100) ^ thresh_count
+          fit <- glmnet(x = x.left, y = y.left, standardize = args.model.selector$standardize,
+                        intercept = args.model.selector$intercept, thresh = threshn,family = family)
+          if (verbose) cat(threshn,"\n")
+          coefs <- coef(fit,x = x.left,y = y.left,s = lambda/n.left,exact = TRUE,
+                        standardize = args.model.selector$standardize, 
+                        intercept = args.model.selector$intercept, thresh = threshn, family = family)
+          beta <- coefs[-1]
+          sel.model <- which(abs(beta) > 0)
+          
+          if (family == "binomial") beta <- coefs
+          p.sel <- length(sel.model)
+          if (p.sel == 0) fit_again <- FALSE
+          warning(paste("reducing threshold", thresh_count, "to", threshn, sep = " "))
+        }
+      }
+      
+      p.sel <- length(sel.model)
+      # use new split in case of singularity. This is mostly an issue for discrete x.
+      if (args.model.selector$intercept) {
+        if ((p.sel > 0 && (rankMatrix(cbind(rep(1, n.left), x.left[, sel.model]))[[1]]< (p.sel + 1) ||
+                           (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[, sel.model]))[[1]] < (p.sel + 1)))) ||
+            fit_again) split_again <- TRUE
+      } else {
+        if ((p.sel > 1 && (rankMatrix(x.left[, sel.model])[[1]] < (p.sel) ||
+                           (p.sel < n.right  && rankMatrix(x.right[, sel.model])[[1]]< (p.sel)))) ||
+            fit_again) split_again <- TRUE
+      }
+      if (split_again) {
+        reason <- numeric(0)
+        if (args.model.selector$intercept){
+          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
+          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+        } else {
+          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
+          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+        }
+        
+        if (fit_again) reason <- c(reason, "3")
+        split_count <- split_count + 1
+        if (split_count > 4) {
+          stop(paste("More than 5 splits needed, final reason:", reason))
+        }
+        if (verbose) 
+          cat("......Splitting again...\n")
+        warning(paste("Splitting again ", split_count, "reason", reason))
+      }
+    }
+    sel.models[sel.model] <- TRUE
+    return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda))
+  }
+  sel.out <- if (parallel) {
+    stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
+    if (verbose) 
+      cat("...starting parallelization of sample-splits\n")
+    mclapply(1:B, oneSplit_select, mc.cores = ncores)
+  } else {
+    lapply(1:B, oneSplit_select)
+  }
+  if (skip.variables){
+    myExtract.sel <- function(name) {
+      matrix(unlist(lapply(sel.out, "[[", name)), nrow = B, 
+             byrow = TRUE)
+    }
+    sel.models <- myExtract.sel("sel.models")
+    times.selected <- apply(sel.models, 2, sum)
+    which.check <- which(times.selected >= min(gamma) *B)
+    warning(paste("Reducing number of tests from", sum(sel.models), "to", sum(sel.models[, which.check])))
+  } else {
+    which.check <- NULL
+  }
+  
+  oneSplit_infer<- function(sel) {
     if (split_pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
     } else {
       pvals.v <- rep(1, p)
     }
-    sel.models <- logical(p)
-    try.again <- TRUE
-    fLI_error <- 0L
-    split_count <- 0
-    while (try.again) {
-      thresh_count <- 0L
-      threshn <- 1e-7
-      fLI_problem <- TRUE
-      continue <- TRUE
-      split_again <- TRUE
-      while (split_again) {
-        split_again <- FALSE
-        split <- sample.int(n, size = n.left)
-        x.left <- x[split, ]
-        y.left <- y[split]
+    sel.models <- sel$sel.models
+    sel.model <- which(sel.models)
+    p.sel <- length(sel.model)
+    beta <- sel$beta
+    split <- sel$split
+    lambda <- sel$lambda
+    
+    if (se.estimator == "modwise" && family == "gaussian") {
+      if (length(beta) == p + 1) beta <- beta[-1]
+      if (args.model.selector$intercept){
+        RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
+        if (args.se.estimator$df_corr) {
+          den <- n - p.sel - 1
+        } else {
+          den <- n
+        }
+        sigma_model <- sqrt(RSS / den)
+      } else {
+        RSS <- sum((y- x %*% beta) ^ 2)
+        if (args.se.estimator$df_corr) {
+          den <- n - p.sel
+        } else {
+          den <- n
+        }
+        sigma_model <- sqrt(RSS / den)
+      }
+      estSigma <- sigma_model
+      args.lasso.inference$sigma <- sigma_model
+      args.classical.fit$Sigma <- sigma_model
+    }
+    if (p.sel > 0) {
+      fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
+                                                                      lambda = lambda, intercept = args.model.selector$intercept, which.check = which.check),
+                                                                 args.lasso.inference)), 0)
+      if (!is.null(fLItry$error)) {
+        warning(paste("Failed to infer a split, due to:", fLItry$error, sep=" "))
+        pvals.v[] = NA
+        list(pvals = pvals.v, sel.models = sel.models, 
+             split = split)
+      } else if (!is.null(fLItry$warning)) {
+        for (war in unique(fLItry$warning)) {
+          warning(paste(war, sep = " "))
+        }
+      }
+      fLI <- fLItry$value
+      sel.pval1 <- fLI$pv
+      if (any(is.na(sel.pval1))) {
+        stop("The carve procedure returned a p-value NA")
+      } 
+      if (length(sel.pval1) != p.sel) { 
+        stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel.",
+                   p.sel, length(sel.pval1)))
+      }
+      if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
+        stop("The carve procedure returned values below 0 or above 1 as p-values")
+      }
+      if (FWER) {
+        sel.pval1 <- pmin(sel.pval1 * p.sel, 1) # for FWER
+      } else {
+        sel.pval1 <- pmin(sel.pval1, 1) # for FCR
+      }
+      if (split_pval) {
         x.right <- x[-split, ]
         y.right <- y[-split]
-
-        output <- do.call(model.selector, args = c(list(x = x.left, 
-                                                        y = y.left), args.model.selector))
-        sel.model <- output$sel.model
-        beta <- output$beta
-        lambda <- output$lambda
-        
-        fit_again <- TRUE
-        thresh_count <- 0
-        p.sel <- length(sel.model)
-        # for empty model, active constraints are trivially fulfilled
-        if (p.sel == 0) fit_again <- FALSE
-
-        while (fit_again) {
-          fit_again <- FALSE
-          checktry <- tryCatch_W_E(constraint_checker(x.left, y.left, beta, 0, lambda,
-                                                      family, intercept = args.model.selector$intercept), TRUE)
-          if (is.null(checktry$error)) {
-            check <- checktry$value
-          } else {
-            # if run into numerical instability when checking constraints
-            check <- TRUE
-            split_again <- TRUE
-            warning(paste(checktry$error, p.sel, " variables selected with ",
-                          n.left, "data points, splitting again"))
-          }
-          if (!check) {
-            if (verbose) 
-              cat("......fit again...\n")
-            fit_again <- TRUE
-            thresh_count <- thresh_count + 1
-            if (thresh_count > 2) {
-              warning("Giving up reducing threshhold")
-              break()
-            }
-            threshn <- 1e-7 / (100) ^ thresh_count
-            fit <- glmnet(x = x.left, y = y.left, standardize = args.model.selector$standardize,
-                          intercept = args.model.selector$intercept, thresh = threshn,family = family)
-            if (verbose) cat(threshn,"\n")
-            coefs <- coef(fit,x = x.left,y = y.left,s = lambda/n.left,exact = TRUE,
-                          standardize = args.model.selector$standardize, 
-                          intercept = args.model.selector$intercept, thresh = threshn, family = family)
-            beta <- coefs[-1]
-            sel.model <- which(abs(beta) > 0)
-
-            if (family == "binomial") beta <- coefs
-            p.sel <- length(sel.model)
-            if (p.sel == 0) fit_again <- FALSE
-            warning(paste("reducing threshold", thresh_count, "to", threshn, sep = " "))
-          }
-        }
-          
-        p.sel <- length(sel.model)
-        # use new split in case of singularity. This is mostly an issue for discrete x.
         if (args.model.selector$intercept) {
-          if ((p.sel > 0 && (rankMatrix(cbind(rep(1, n.left), x.left[, sel.model]))[[1]]< (p.sel + 1) ||
-                            (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[, sel.model]))[[1]] < (p.sel + 1)))) ||
-              fit_again) split_again <- TRUE
+          bound <- n.right-1
         } else {
-          if ((p.sel > 1 && (rankMatrix(x.left[, sel.model])[[1]] < (p.sel) ||
-                            (p.sel < n.right  && rankMatrix(x.right[, sel.model])[[1]]< (p.sel)))) ||
-              fit_again) split_again <- TRUE
+          bound <- n.right
         }
-        if (split_again) {
-          reason <- numeric(0)
-          if (args.model.selector$intercept){
-            if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
-            if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+        if (p.sel < bound) {
+          sel.pval2try <- tryCatch_W_E(do.call(classical.fit, 
+                                               args = c(list(x = x.right[, sel.model], y = y.right), args.classical.fit)),
+                                       rep(NA, p.sel))
+          sel.pval2 <- sel.pval2try$value
+          if (!is.null(sel.pval2try$error)) {
+            warning(paste(sel.pval2try$error, "while caluclatng split p-values", sep=" "))
+          }
+          NAs <- FALSE
+          if (any(is.na(sel.pval2))) NAs <- TRUE
+          # do not stop if splitting leads to NA
+          if (length(sel.pval2) != p.sel) 
+            stop("The classical.fit function didn't return the correct number of p-values for the provided submodel.")
+          if (!all(sel.pval2 >= 0 & sel.pval2 <= 1) && !NAs) 
+            stop("The classical.fit function returned values below 0 or above 1 as p-values")
+          if (FWER) {
+            sel.pval2 <- pmin(sel.pval2 * p.sel, 1) # for FWER
           } else {
-            if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
-            if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+            sel.pval2 <- pmin(sel.pval2, 1) # for FCR
           }
-
-          if (fit_again) reason <- c(reason, "3")
-          split_count <- split_count + 1
-          if (split_count > 4) {
-            stop(paste("More than 5 splits needed, final reason:", reason))
-          }
-          if (verbose) 
-            cat("......Splitting again...\n")
-          warning(paste("Splitting again ", split_count, "reason", reason))
-        }
-      }
-
-      if (se.estimator == "modwise" && family == "gaussian") {
-        if (length(beta) == p + 1) beta <- beta[-1]
-        if (args.model.selector$intercept){
-          RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-          if (args.se.estimator$df_corr) {
-            den <- n - p.sel - 1
-          } else {
-            den <- n
-          }
-          sigma_model <- sqrt(RSS / den)
+          pvals.v[1, sel.model] <- sel.pval1
+          pvals.v[2, sel.model] <- sel.pval2
         } else {
-          RSS <- sum((y- x %*% beta) ^ 2)
-          if (args.se.estimator$df_corr) {
-            den <- n - p.sel
-          } else {
-            den <- n
-          }
-          sigma_model <- sqrt(RSS / den)
+          # if split p-values can not be determined, leave them at 1
+          pvals.v[1,sel.model] <- sel.pval1
         }
-        estSigma <- sigma_model
-        args.lasso.inference$sigma <- sigma_model
-        args.classical.fit$Sigma <- sigma_model
+      } else {
+        pvals.v[sel.model] <- sel.pval1
       }
       
-      if (p.sel > 0) {
-        fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
-                                                                        lambda = lambda, intercept = args.model.selector$intercept),
-                                                                   args.lasso.inference)), 0)
-        if (!is.null(fLItry$error)) {
-          if (verbose) {
-            cat("......split again...\n")
-            cat(fLItry$error, "\n")
-          }
-          warning(paste(fLItry$error, "yielding restart", sep=" "))
-          continue <- FALSE
-          split_count <- split_count + 1
-          if (split_count > 4) {
-            stop(paste("More than 5 splits needed, final reason:", 4))
-          }
-        } else if (!is.null(fLItry$warning)) {
-          for (war in unique(fLItry$warning)) {
-            warning(paste(war, sep = " "))
-          }
-        }
-        if (continue) {
-          fLI <- fLItry$value
-          sel.pval1 <- fLI$pv
-          if (any(is.na(sel.pval1))) {
-            stop("The carve procedure returned a p-value NA")
-          } 
-          if (length(sel.pval1) != p.sel) { 
-            stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel.",
-                       p.sel, length(sel.pval1)))
-          }
-          if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
-            stop("The carve procedure returned values below 0 or above 1 as p-values")
-          }
-          if (FWER) {
-            sel.pval1 <- pmin(sel.pval1 * p.sel, 1) # for FWER
-          } else {
-            sel.pval1 <- pmin(sel.pval1, 1) # for FCR
-          }
-          if (split_pval) {
-            if (args.model.selector$intercept) {
-              bound <- n.right-1
-            } else {
-              bound <- n.right
-            }
-            if (p.sel < bound) {
-              sel.pval2try <- tryCatch_W_E(do.call(classical.fit, 
-                                                   args = c(list(x = x.right[, sel.model], y = y.right), args.classical.fit)),
-                                           rep(NA, p.sel))
-              sel.pval2 <- sel.pval2try$value
-              if (!is.null(sel.pval2try$error)) {
-                warning(paste(sel.pval2try$error, "while caluclatng split p-values", sep=" "))
-              }
-              NAs <- FALSE
-              if (any(is.na(sel.pval2))) NAs <- TRUE
-              # do not stop if splitting leads to NA
-              if (length(sel.pval2) != p.sel) 
-                stop("The classical.fit function didn't return the correct number of p-values for the provided submodel.")
-              if (!all(sel.pval2 >= 0 & sel.pval2 <= 1) && !NAs) 
-                stop("The classical.fit function returned values below 0 or above 1 as p-values")
-              if (FWER) {
-                sel.pval2 <- pmin(sel.pval2 * p.sel, 1) # for FWER
-              } else {
-                sel.pval2 <- pmin(sel.pval2, 1) # for FCR
-              }
-              pvals.v[1, sel.model] <- sel.pval1
-              pvals.v[2, sel.model] <- sel.pval2
-            } else {
-              # if split p-values can not be determined, leave them at 1
-              pvals.v[1,sel.model] <- sel.pval1
-            }
-          } else {
-            pvals.v[sel.model] <- sel.pval1
-          }
-
-          if (return.selmodels) 
-            sel.models[sel.model] <- TRUE
-          try.again <- FALSE
-        }
-      }
-
-      if (p.sel == 0) {
-        # leave all p-values to be 1
-        if (verbose) 
-          cat("......Empty model selected. That's ok...\n")
-        try.again <- FALSE
-      }
-
-
     }
+    
+    if (p.sel == 0) {
+      # leave all p-values to be 1
+      if (verbose) 
+        cat("......Empty model selected. That's ok...\n")
+    }
+    
+    
     list(pvals = pvals.v, sel.models = sel.models, 
          split = split)
   }
-  split.out <- if (parallel) {
+  inf.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
       cat("...starting parallelization of sample-splits\n")
-    mclapply(1:B, oneSplit, mc.cores = ncores)
+    mclapply(sel.out, oneSplit_infer, mc.cores = ncores)
   } else {
-    if (verbose) 
-      lapply(1:B, function(b) {
-        cat("...Split", b, "\n")
-        oneSplit()
-      })
-    else replicate(B, oneSplit(), simplify = FALSE)
+    lapply(sel.out, oneSplit_infer)
   }
   myExtract <- function(name) {
-    matrix(unlist(lapply(split.out, "[[", name)), nrow = B, 
+    matrix(unlist(lapply(inf.out, "[[", name)), nrow = B, 
            byrow = TRUE)
   }
   if (split_pval) { 
     ls <- list()
-    pvalsall <- array(unlist(lapply(split.out, "[[", "pvals")), dim = c(2, p, B))
+    pvalsall <- array(unlist(lapply(inf.out, "[[", "pvals")), dim = c(2, p, B))
     for (icf in  1:2) {
       pvals <- t(pvalsall[icf, , ])
       colnames(pvals) <- colnames(x)
@@ -329,20 +341,20 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         }
       }
       names(pvals.current) <- names(which.gamma) <- colnames(x)
-
+      
       if (!return.nonaggr) 
         pvals <- NA
       if (return.selmodels) {
         if (icf==2) {
-          keep <- c("return.selmodels", "x", "y", "gamma", "split.out", 
+          keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
                     "pvals", "pvals.current", "which.gamma", "sel.models","ls","icf")
           rm(list = setdiff(names(environment()), keep))
         }
       }
       ls[[icf]] <- structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                     gamma.min = gamma[which.gamma], sel.models = sel.models,
-                     method = "multi.split", call = match.call()), class = "hdi")
-
+                                  gamma.min = gamma[which.gamma], sel.models = sel.models,
+                                  method = "multi.split", call = match.call()), class = "hdi")
+      
     }
     return(ls)
   } else {
@@ -368,13 +380,13 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
     if (!return.nonaggr) 
       pvals <- NA
     if (return.selmodels) {
-      keep <- c("return.selmodels", "x", "y", "gamma", "split.out", 
+      keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
                 "pvals", "pvals.current", "which.gamma", "sel.models")
       rm(list = setdiff(names(environment()), keep))
     }
     structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                 gamma.min = gamma[which.gamma], sel.models = sel.models,
-                 method = "multi.split", call = match.call()), class = "hdi")
+                   gamma.min = gamma[which.gamma], sel.models = sel.models,
+                   method = "multi.split", call = match.call()), class = "hdi")
   }
 }
 
