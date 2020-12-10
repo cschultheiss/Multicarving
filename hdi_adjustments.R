@@ -379,19 +379,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
 }
 
 
-fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact = FALSE, ...) {
-  fit<-glmnet(x, y, alpha = 1, thresh = thresh,...)
-  if (exact) {
-    coefs <-coef(fit, s = lambda / (dim(x)[1]),x = x,
-                 y = y, exact = exact, thresh = thresh) #lambda/n1 due to different definition of the LASSO loss function 
-  } else {
-    coefs <- coef(fit, s = lambda / (dim(x)[1])) #lambda/n1 due to different definition of the LASSO loss function
-  }
-  
-  beta <- coefs[2 : (dim(x)[2] + 1)]
-  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
-  return(list(sel.model = chosen, beta = beta, lambda = lambda))
-}
+
 
 lm.pval.flex <- function (x, y, exact = TRUE, intercept = TRUE, Sigma = NA, ttest = TRUE, ...) {
   if (intercept) {
@@ -435,6 +423,7 @@ pval.aggregator <- function(pval.list, gamma, cutoff = TRUE) {
   return(aggregated.list)
 }
 
+# different Lasso selector
 
 lasso.firstqcoef <- function (x, y, q, tol.beta = 0, return_intercept = NULL, ...) {
   fit <- glmnet(x, y, dfmax = q,...)
@@ -478,6 +467,20 @@ lasso.cvcoef<-function (x, y, nfolds = 10, grouped = nrow(x) > 3 * nfolds,
     chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
   }
   return(list(sel.model = chosen,beta = return_beta,lambda = lambda*dim(x)[1]))
+}
+
+fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact = FALSE, ...) {
+  fit<-glmnet(x, y, alpha = 1, thresh = thresh,...)
+  if (exact) {
+    coefs <-coef(fit, s = lambda / (dim(x)[1]),x = x,
+                 y = y, exact = exact, thresh = thresh) #lambda/n1 due to different definition of the LASSO loss function 
+  } else {
+    coefs <- coef(fit, s = lambda / (dim(x)[1])) #lambda/n1 due to different definition of the LASSO loss function
+  }
+  
+  beta <- coefs[2 : (dim(x)[2] + 1)]
+  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) #model indices
+  return(list(sel.model = chosen, beta = beta, lambda = lambda))
 }
 
 estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df_corr = FALSE) {
