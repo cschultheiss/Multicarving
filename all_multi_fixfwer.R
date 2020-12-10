@@ -190,7 +190,7 @@ for (frac in frac_vec) {
       reported_sigma <- estSigma$sigmahat
     }
 
-    mcrtry <- tryCatch_W_E(multi.carve.re(x, y, B = B, fraction = frac, model.selector = lasso.cvcoef,
+    mcrtry <- tryCatch_W_E(multi.carve(x, y, B = B, fraction = frac, model.selector = lasso.cvcoef,
                                        classical.fit = lm.pval.flex, parallel = FALSE,
                                        ncores = getOption("mc.cores", 2L), # aggregate outside to test different methods
                                        args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use_lambda.min = FALSE),
@@ -200,8 +200,8 @@ for (frac in frac_vec) {
                                                                                              verbose = TRUE, selected = TRUE)), 0)
     c100try <- tryCatch_W_E(carve100(x, y, model.selector = lasso.cvcoef,
                                      args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 1e-5, use_lambda.min = FALSE),
-                                     repeat.max = 20, verbose = FALSE, FWER = FALSE, return.selmodels = TRUE, return.nonaggr = TRUE,
-                                     use_sigma_modwise = usei, args.lasso.inference = list(sigma = reported_sigma)), 0)
+                                     verbose = FALSE, FWER = FALSE, return.selmodels = TRUE,
+                                     estimate.sigma = FALSE, args.lasso.inference = list(sigma = reported_sigma)), 0)
     
     out_list <- list()
     out_list$y <- y

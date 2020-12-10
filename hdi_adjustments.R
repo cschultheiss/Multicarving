@@ -34,6 +34,8 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   
   
   args.model.selector$family <- family
+  args.lasso.inference$family <- family
+  
   if (family == "gaussian"){
     if (se.estimator == "None" && is.na(args.lasso.inference$sigma)) stop("Neither SE estimator type nor sigma provided for Gaussian family. This is not ok")
     if (is.na(args.lasso.inference$sigma)) {
@@ -395,6 +397,7 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
                       args.lasso.inference = list(sigma = NA,intercept = TRUE)) {
 
   args.model.selector$family <- family
+  args.lasso.inference$family <- family
   
   if (family == "gaussian" && !estimate.sigma && is.na(args.lasso.inference$sigma)) stop("Sigma not provided and estimation not enabled for Gaussian family. This is not ok")
   if (!is.na(args.lasso.inference$sigma)) estimate.sigma <- FALSE
@@ -481,7 +484,7 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
     if (length(beta) == p + 1) beta <- beta[-1]
     if (args.model.selector$intercept){
       RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-      if (df_corr) {
+      if (df.corr) {
         den <- n - p.sel - 1
       } else {
         den <- n
@@ -489,7 +492,7 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
       sigma_model <- sqrt(RSS / den)
     } else {
       RSS <- sum((y- x %*% beta) ^ 2)
-      if (args.se.estimator$df_corr) {
+      if (df.corr) {
         den <- n - p.sel
       } else {
         den <- n
