@@ -130,7 +130,7 @@ for (n in n_vec) {
                                                  return.nonaggr = TRUE,return.selmodels = TRUE,
                                                  args.model.selector = list(standardize = FALSE, intercept = TRUE,
                                                                             tol.beta = 0, use_lambda.min = TRUE),
-                                                 args.lasso_inference = list(verbose = TRUE, sigma = sigmahat),
+                                                 args.lasso.inference = list(verbose = TRUE, sigma = sigmahat),
                                                  groups = groupstotest), 0)
         if (!is.null(mcgtry$error)) {
           # error handling

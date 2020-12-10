@@ -464,7 +464,7 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
 
 OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian", groups,
                                    intercept = TRUE, ndraw = 8000, burnin = 2000,
-                                   sig_Level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE) {
+                                   sig_Level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE, which.check = NULL) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -656,7 +656,12 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
 
   nskipped <- 0
   for (group in groups) {
-    j <- j+1
+    j <- j + 1
+    if (!is.null(which.check) && !(j %in% which.check)){
+      if (verbose) print(paste("Not checking group", j))
+      pvaluessum[j] <- 1
+      next()
+    } 
     if (intercept) {
       group.vars <- which((chosen-1) %in% group)
     } else {

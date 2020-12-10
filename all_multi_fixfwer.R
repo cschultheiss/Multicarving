@@ -232,7 +232,7 @@ for (frac in frac_vec) {
       psplit_fwer <- psplit_nofwer*model_size
       c100 <- c100try$value
       pc100_nofwer <- c100$pval.corr
-      model_size100 <- apply(c100$sel.models, 1, sum)
+      model_size100 <- sum(c100$sel.models)
       model_size100[model_size100 == 0]  <- 1
       # pc100_fwer <- pmin(pc100_nofwer * model_size100, 1)
       pc100_fwer <- pc100_nofwer * model_size100
