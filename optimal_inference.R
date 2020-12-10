@@ -1,6 +1,6 @@
 # this file contains the necessary routines to execute data carving after model selection
 # either for single variable testing or group testing
-# the sampler is defined elsewhere 
+# the sampler is defined elsewhere
 
 
 OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian",
