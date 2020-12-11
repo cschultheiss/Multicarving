@@ -1560,24 +1560,17 @@ does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
   }
   if (any(is.na(pvals))) stop("At least one p-value is NA")
   pvals <- pmin(pvals, 1-pvals)
+  if (multi.corr) pvals <- pvals * s0
   pval.rank <- rank(pvals, ties.method = "first")
   nsplit <- length(pval.rank) + no.inf.ci
   gamma.b <- pval.rank / nsplit
 
-  if (multi.corr) {
-    # recheck multiplicity correction logic
-    if (any(is.na(s0))) 
-      stop("need s0 information to be able to create multiple testing corrected pvalues")
-    level <- (1 - alpha * gamma.b / (1 - log(gamma.min) * s0))
-  } else {
-    level <- (1 - alpha * gamma.b / (1 - log(gamma.min)))
-  }
-
+  alpha.b <- (alpha * gamma.b / (1 - log(gamma.min)))
   if (all(gamma.b < gamma.min)) {
+    # we should not get to this point, since the number of infinite CI's is checked
     return(TRUE)
   } else {
-    level <- 1-level
-    coveredpre <- all(level[gamma.b >= gamma.min] < 2 * pvals[gamma.b >= gamma.min])
+    coveredpre <- all(alpha.b[gamma.b >= gamma.min] < 2 * pvals[gamma.b >= gamma.min])
     return(coveredpre)
   }
 }
