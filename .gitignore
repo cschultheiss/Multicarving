@@ -4,5 +4,6 @@
 .Ruserdata
 Multicarving Inference.Rproj
 multi_carve
+group_example
 *.Rout
 

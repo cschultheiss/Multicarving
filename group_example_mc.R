@@ -34,6 +34,7 @@ if (local) {
 } else {
   source("hdi_adjustments.R")
   source("optimal_inference.R")
+  source("sample_from_truncated.R")
   source("tryCatch-W-E.R")
 }
 
@@ -44,17 +45,17 @@ if (local) {
 p <- 500
 rho <- 0.6
 Cov <- toeplitz(rho ^ (seq(0, p - 1)))
-# # sparse alternative
-# subcov <- matrix(0.8, 5, 5)
-# diag(subcov) <- 1
-# Cov[1:5, 1:5] <- subcov
+# sparse alternative
+subcov <- matrix(0.8, 5, 5)
+diag(subcov) <- 1
+Cov[1:5, 1:5] <- subcov
 
 truebeta <- rep(0, p)
-delta_vec <- seq(0, 0.06, 0.02)
-n_vec <- c(250, 350, 500, 800)
-# # sparse alternative
-# delta_vec <- seq(0, 0.5, 0.1)
-# n_vec <- c(250, 350, 500)
+# delta_vec <- seq(0, 0.06, 0.02)
+# n_vec <- c(250, 350, 500, 800)
+# sparse alternative
+delta_vec <- seq(0, 0.5, 0.1)
+n_vec <- c(250)# c(250, 350, 500)
 frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99, 1)
 B_vec <- c(1, (1:5) * 10)
 b_vec <- B_vec
@@ -82,11 +83,11 @@ print(seed_v) # 3588 3052 2252 5257 8307 ...
 seed_n <- 0
 
 sigma <- 1
-ind <- c(25:50)
-groupstotest <- list(30:200)
-# # sparse alternative
-# ind <- c(1, 3)
-# groupstotest <- list(c(1:5))
+# ind <- c(25:50)
+# groupstotest <- list(30:200)
+# sparse alternative
+ind <- c(1, 3)
+groupstotest <- list(c(1:5))
 
 for (n in n_vec) {
   for (delta in delta_vec) {
@@ -127,7 +128,7 @@ for (n in n_vec) {
         sigmahat <- estimateSigma(scale(x, T, F), scale(y, T, F),
                                   intercept = FALSE, standardize = FALSE)$sigmahat
         mcgtry <- tryCatch_W_E(multi.carve_group(x, y, B, frac, model.selector = lasso.cvcoef, gamma = 1,
-                                                 return.nonaggr = TRUE,return.selmodels = TRUE,
+                                                 return.nonaggr = TRUE, return.selmodels = TRUE, skip.groups = FALSE,
                                                  args.model.selector = list(standardize = FALSE, intercept = TRUE,
                                                                             tol.beta = 0, use_lambda.min = TRUE),
                                                  args.lasso.inference = list(verbose = TRUE, sigma = sigmahat),
