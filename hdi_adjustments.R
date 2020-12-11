@@ -1437,7 +1437,7 @@ glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
     }
   }
   if (incs>0) warning(paste("Increased delta to ", delta))
-  return(glm.pval(x, pseudo.y,maxit = maxit, epsilon = epsilon))
+  return(glm.pval(x, pseudo.y, maxit = maxit, epsilon = epsilon))
 }
 
 
@@ -1452,6 +1452,7 @@ aggregate.ci.saturated <- function(vlo, vup, centers, ses, gamma.min, multi.corr
   }
   if ((no.inf.ci == B) || (no.inf.ci > (1 - gamma.min) * 
                                      B)) {
+    # variable not select frequently enough
     return(c(-Inf, Inf))
   }
   vlo <- vlo[!inf.ci]
@@ -1463,6 +1464,7 @@ aggregate.ci.saturated <- function(vlo, vup, centers, ses, gamma.min, multi.corr
                   no.inf.ci = no.inf.ci, ses = ses, 
                   s0 = s0,  gamma.min = gamma.min, multi.corr = multi.corr, 
                   ci.level = ci.level)
+  # find a starting point within the interval
   inner <- find.inside.point.gammamin.saturated(low = min(centers), high = max(centers), 
                                       ci.info = ci.info, verbose = verbose)
 
@@ -1533,6 +1535,8 @@ find.inside.point.gammamin.saturated <- function (low, high, ci.info, verbose) {
 }
 
 does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
+  # is beta.j within the interval
+  # i.e. is th two-sided pvalue of beta \geq 1 - ci.level
   if (missing(ci.info)) 
     stop("ci.info is missing to the function does.it.cover.gammamin")
   centers <- ci.info$centers
@@ -1547,6 +1551,7 @@ does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
   alpha <- 1 - ci.info$ci.level
   pvals <- numeric(npv)
   for (i in 1:npv) {
+    # calculate the per-split p-values, this can be numerically tricky!
     pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i])
     if (pvals[i] == 0 || pvals[i] == 1 || is.na(pvals[i])) {
       pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta.j, ses[i], vlo[i], vup[i], bits = 2)
@@ -1560,6 +1565,7 @@ does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
   gamma.b <- pval.rank / nsplit
 
   if (multi.corr) {
+    # recheck multiplicity correction logic
     if (any(is.na(s0))) 
       stop("need s0 information to be able to create multiple testing corrected pvalues")
     level <- (1 - alpha * gamma.b / (1 - log(gamma.min) * s0))
@@ -1577,6 +1583,7 @@ does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
 }
 
 find.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose, timeout = 10) {
+  # find a point that is definitely outside the interval
   reset.shouldnotcover <- FALSE
   if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
     reset.shouldnotcover <- TRUE
@@ -1620,6 +1627,7 @@ find.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcove
 }
 
 bisection.gammamin.coverage.saturated <- function (outer, inner, ci.info, verbose, eps.bound = 10 ^ (-7)) {
+  # find parameter with a p-value of exactly 1-ci.level with a precision of eps.bound (precision of the parameter)
   check.bisection.bounds.gammamin.saturated(shouldcover = inner, shouldnotcover = outer, 
                                   ci.info = ci.info, verbose = verbose)
   eps <- 1
@@ -1640,6 +1648,7 @@ bisection.gammamin.coverage.saturated <- function (outer, inner, ci.info, verbos
 }
 
 check.bisection.bounds.gammamin.saturated <- function (shouldcover, shouldnotcover, ci.info, verbose) {
+  # this function should not fail
   if (does.it.cover.gammamin.saturated(beta.j = shouldnotcover, ci.info = ci.info)) {
     stop("shouldnotcover bound is covered! we need to decrease it even more! (PLZ implement)")
   } else {
