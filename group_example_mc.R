@@ -59,7 +59,7 @@ truebeta <- rep(0, p)
 # n_vec <- c(250, 350, 500, 800)
 # sparse alternative
 delta_vec <- seq(0.2, 0.5, 0.1) # seq(0, 0.5, 0.1)
-n_vec <- c(250)# c(250, 350, 500)
+n_vec <- c(250, 350, 500)
 frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99, 1)
 B_vec <- c(1, (1:5) * 10)
 b_vec <- B_vec
@@ -123,13 +123,13 @@ for (n in n_vec) {
       tic()
       res<-foreach(gu=1:nsim, .combine = rbind,
                    .packages = c("MASS","selectiveInference","glmnet","Matrix",
-                                 "hdi","tmg","truncnorm"),.options.snow=opts) %dorng%{
+                                 "hdi", "tmg","truncnorm"),.options.snow=opts) %dorng%{
       # alternative if sequential computation is preferred
       # res<-foreach(gu=1:nsim,.combine = rbind) %do%{
-       
+                                   
         x <- mvrnorm(n, rep(0, p), Cov)
         u <- rnorm(n) * sigma
-        y <- x %*% truebeta + u
+        y <- x %*% truebeta + u                          
         sigmahat <- estimateSigma(scale(x, T, F), scale(y, T, F),
                                   intercept = FALSE, standardize = FALSE)$sigmahat
         mcgtry <- tryCatch_W_E(multi.carve_group(x, y, B, frac, model.selector = lasso.cvcoef, gamma = 1,
@@ -219,6 +219,7 @@ for (n in n_vec) {
       succ = which(is.na(expmatr[, 1]))
       print("succesful runs")
       all_y <- matrix(unlist(res[,"y"]), nrow = dim(res), byrow = TRUE)
+      sd <- attr(res, "rng")
       for (B in B_vec) {
         if (B == 1) {
           names <- c("carve")
@@ -238,7 +239,7 @@ for (n in n_vec) {
         subres <- as.data.frame(subres)
         simulation <- list("results" = subres, "B" = B, "n" = n ,
                            "exceptions" = expmatr, "y" = all_y, "split" = frac,
-                           "delta" = delta, "nsim" = nsim, "seed" = rseed, "commit" = commit )
+                           "delta" = delta, "nsim" = nsim, "seed" = rseed, "sd" = sd, "commit" = commit )
         print(paste("results using fraction ", frac, " B=", B, " delta=",
                     delta, " and n=", n, sep=""))
         options(digits = 3)
