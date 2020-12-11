@@ -24,6 +24,10 @@ require(doSNOW)
 require(parallel)
 require(doRNG)
 require(tmg)
+require(git2r)
+
+commit <- revparse_single(revision = "HEAD")
+print(paste("Run on commit", commit$sha, 'i.e.:', commit$summary))
 
 
 if (local) {
@@ -54,7 +58,7 @@ truebeta <- rep(0, p)
 # delta_vec <- seq(0, 0.06, 0.02)
 # n_vec <- c(250, 350, 500, 800)
 # sparse alternative
-delta_vec <- seq(0, 0.5, 0.1)
+delta_vec <- seq(0.2, 0.5, 0.1) # seq(0, 0.5, 0.1)
 n_vec <- c(250)# c(250, 350, 500)
 frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99, 1)
 B_vec <- c(1, (1:5) * 10)
@@ -78,7 +82,8 @@ progress <- function(n, tag) {
 }
 RNGkind("L'Ecuyer-CMRG")
 set.seed(42) 
-seed_v <- sample(1:10000,length(frac_vec)*length(delta_vec)*length(n_vec))
+seed_v <- sample(1:10000,length(frac_vec)*length(delta_vec)*length(n_vec)+12)
+seed_v <- seed_v[-c(1:12)]
 print(seed_v) # 3588 3052 2252 5257 8307 ...
 seed_n <- 0
 
@@ -133,12 +138,13 @@ for (n in n_vec) {
                                                                             tol.beta = 0, use_lambda.min = TRUE),
                                                  args.lasso.inference = list(verbose = TRUE, sigma = sigmahat),
                                                  groups = groupstotest), 0)
+        out_list <- list()
+        out_list$y <- y
         if (!is.null(mcgtry$error)) {
           # error handling
           err <- paste("mcr:", mcgtry$error)
           war <- if (is.null(mcgtry$warning)) NA
           else c(mcgtry$warning)
-          out_list <- list()
           for (b in B_vec) {
             if (b > 1) {
               out_list[[as.character(b)]] <- rep(NA, (length(groupstotest)) * 4)
@@ -151,7 +157,6 @@ for (n in n_vec) {
         } else {
           mcg <- mcgtry$value
           pcarve <- mcg$pvals.nonaggr
-          out_list <- list()
           for (B in B_vec) {
             if (B > 1) {
               use <- 1:B
@@ -213,6 +218,7 @@ for (n in n_vec) {
       print(sum(is.na(expmatr[, 1])))
       succ = which(is.na(expmatr[, 1]))
       print("succesful runs")
+      all_y <- matrix(unlist(res[,"y"]), nrow = dim(res), byrow = TRUE)
       for (B in B_vec) {
         if (B == 1) {
           names <- c("carve")
@@ -231,8 +237,8 @@ for (n in n_vec) {
         }
         subres <- as.data.frame(subres)
         simulation <- list("results" = subres, "B" = B, "n" = n ,
-                           "exceptions" = expmatr, "split" = frac,
-                           "delta" = delta, "nsim" = nsim, "seed" = rseed )
+                           "exceptions" = expmatr, "y" = all_y, "split" = frac,
+                           "delta" = delta, "nsim" = nsim, "seed" = rseed, "commit" = commit )
         print(paste("results using fraction ", frac, " B=", B, " delta=",
                     delta, " and n=", n, sep=""))
         options(digits = 3)
