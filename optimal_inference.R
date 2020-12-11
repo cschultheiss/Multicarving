@@ -368,7 +368,7 @@ conditional<-function(S, mean, C, d) {
 }
 
 
-whiten<-function(cov, linear_part, b, mmean) {
+whiten <- function(cov, linear_part, b, mmean) {
   #   Return a whitened version of constraints in a different
   #   basis, and a change of basis matrix.
 
@@ -436,14 +436,14 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
     trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
                                                      -new_A, as.vector(new_b), burn.in = burnin)},
                                                timeout = 6, on_timeout = "error"), 0)
-    if (!is.null(trywhite$error)) {
+    if (!is.null(trywhite$error) || !is.null(trywhite$warning)) {
       skip <<- TRUE
       if (ft){
         first_text <- "this variable was tested for the first time"
       } else {
         first_text <- "this variable was not tested for the first time"
       }
-      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
+      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, trywhite$warning, first_text, "using hit-and-run sampler"))
       white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
       #  sample from whitened points with new constraints
       white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
