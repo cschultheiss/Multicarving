@@ -376,7 +376,7 @@ whiten <- function(cov, linear_part, b, mmean) {
   rank <- rankMatrix(cov)[1]
   ev <- eigen(cov)
   D1 <- ev$values
-  rank <- sum(abs(D1) > 1e-5 * abs(D1[1]))
+  # rank <- sum(abs(D1)> 1e-5 * abs(D1[1]))
   U <- ev$vectors
   Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
   while (!is.null(Dtry$warning)) {
@@ -420,6 +420,7 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
   new_A <- white_out$new_A
   new_b <- white_out$new_b
   white_Y <- forward_map(Y)
+  if (max (new_A %*% white_Y - new_b) > 0) stop("Constraints not fulfilled after whitening")
   if (skip) {
     # if Hamiltonian sampler got stuck before for same set-up do not try again
     white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
@@ -436,14 +437,14 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
     trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
                                                      -new_A, as.vector(new_b), burn.in = burnin)},
                                                timeout = 6, on_timeout = "error"), 0)
-    if (!is.null(trywhite$error) || !is.null(trywhite$warning)) {
+    if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
       skip <<- TRUE
       if (ft){
         first_text <- "this variable was tested for the first time"
       } else {
         first_text <- "this variable was not tested for the first time"
       }
-      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, trywhite$warning, first_text, "using hit-and-run sampler"))
+      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
       white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
       #  sample from whitened points with new constraints
       white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
