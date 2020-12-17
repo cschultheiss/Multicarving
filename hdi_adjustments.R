@@ -1196,7 +1196,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
                          vup = split(vup, rep(1:vars, each = B)), 
                          centers = split(estimates, rep(1:vars, each = B)), 
                          ses = split(sescarve, rep(1:ncol(sescarve), each = B)), 
-                         gamma.min = min(gamma), multi.corr = FALSE, verbose = FALSE, timeout = ci.timeout,
+                         gamma.min = min(gamma), multi.corr = FWER, verbose = FALSE, timeout = ci.timeout,
                          s0 = list(s0 = s0), ci.level = ci.level, var = 1:vars)
       } else {
         new.ci <- mapply(hdi:::aggregate.ci, lci = split(lci, rep(1:vars, each = B)),
@@ -1296,7 +1296,7 @@ pval.aggregator <- function(pval.list, gamma, cutoff = TRUE) {
     p <- dim(pvals)[2]
     pvals.current <- numeric(p)
     for (j in 1:p) {
-      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
+      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
       penalty <- if (length(gamma) > 1) 
         (1 - log(min(gamma)))
       else 1
@@ -1676,7 +1676,8 @@ pval.creator <- function(beta, gamma, vlo, vup, centers, ses, s0 = NA, multi.cor
   if (multi.corr) {
     if (any(is.na(s0))) 
       stop("need s0 information to be able to create multiple testing corrected pvalues")
-    pvals <- pvals * s0
+    s0 <- s0[test]
+    pvals[1:npv] <- pvals[1:npv] * s0
   }
   pval <- pval.aggregator(list(as.matrix(pvals, ncol = 1)), gamma)
   return(pval)

@@ -131,10 +131,10 @@ for (frac in frac_vec) {
                                      parallel = FALSE, ncores = getOption("mc.cores", 2L), gamma = gammavec,
                                      args.model.selector = list(standardize = FALSE, intercept = TRUE,
                                                                 tol.beta = 0, use_lambda.min = FALSE),
-                                     args.classical.fit = list(Sigma = reported_sigma), repeat.max = 20,
+                                     args.classical.fit = list(Sigma = reported_sigma),
                                      verbose = FALSE, ci.timeout = 10, FWER = FALSE, split_pval = TRUE,
-                                     return.selmodels = TRUE, return.nonaggr = TRUE, use_sigma_modwise = usei,
-                                     args.lasso_inference = list(sigma = reported_sigma, verbose = FALSE)),0)
+                                     return.selmodels = TRUE, return.nonaggr = TRUE,
+                                     args.lasso.inference = list(sigma = reported_sigma, verbose = FALSE)),0)
     
     if(!is.null(mcrtry$error)) {
       err <- paste("mcr:", mcrtry$error)
