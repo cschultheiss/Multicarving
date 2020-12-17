@@ -241,9 +241,9 @@ for (frac in frac_vec) {
         if (B > 1) {
           use <- 1:B
           pvals.aggregated <- pval.aggregator(list(pcarve_nofwer[use, ], pcarve_fwer[use, ], psplit_nofwer[use, ], psplit_fwer[use, ]),
-                                              round(seq(ceiling(0.05 * B)/B, 1 - 1/B, by = 1/B), 2), cutoff = FALSE)
+                                              round(seq(ceiling(0.05 * B)/B, 1, by = 1/B), 2), cutoff = FALSE)
           pvals.aggregated2 <- pval.aggregator(list(pcarve_nofwer[use, ], pcarve_fwer[use, ], psplit_nofwer[use, ], psplit_fwer[use, ]),
-                                               round(seq(ceiling(0.3 * B)/B, 1 - 1/B, by = 1/B), 2), cutoff = FALSE)
+                                               round(seq(ceiling(0.3 * B)/B, 1, by = 1/B), 2), cutoff = FALSE)
           pvals.aggregated3 <- pval.aggregator(list(pcarve_nofwer[use, ], pcarve_fwer[use, ], psplit_nofwer[use, ], psplit_fwer[use, ]),
                                                round(ceiling(0.05 * B)/B, 2), cutoff = FALSE)
           pvals.aggregated4 <- pval.aggregator(list(pcarve_nofwer[use, ], pcarve_fwer[use, ], psplit_nofwer[use, ], psplit_fwer[use, ]),
