@@ -330,7 +330,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       pvals.current <- which.gamma <- numeric(p)
       for (j in 1:p) {
         if (any(!is.na(pvals[, j]))) {
-          quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
+          quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
           penalty <- if (length(gamma) > 1) 
             (1 - log(min(gamma)))
           else 1
@@ -370,7 +370,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
     }
     pvals.current <- which.gamma <- numeric(p)
     for (j in 1:p) {
-      quant.gamma <- quantile(pvals[, j], gamma) / gamma
+      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
       penalty <- if (length(gamma) > 1) 
         (1 - log(min(gamma)))
       else 1
@@ -823,7 +823,7 @@ multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian"
   }
   pvals.current <- which.gamma <- numeric(ngroup)
   for (j in 1:ngroup) {
-    quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
+    quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
     penalty <- if (length(gamma) > 1) 
       (1 - log(min(gamma)))
     else 1
@@ -1175,7 +1175,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       pvals.current <- which.gamma <- numeric(p)
       for (j in 1:p) {
         if (any(!is.na(pvals[, j]))) {
-          quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
+          quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
           penalty <- if (length(gamma) > 1)
             (1 - log(min(gamma)))
           else 1
@@ -1249,7 +1249,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
     sescarve <- myExtract("sescarve")
     pvals.current <- which.gamma <- numeric(p)
     for (j in 1:p) {
-      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE,type = 1) / gamma
+      quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE,type = 3) / gamma
       penalty <- if (length(gamma) > 1) 
         (1 - log(min(gamma)))
       else 1
