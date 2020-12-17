@@ -697,10 +697,19 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
       ft <<- TRUE # indicator whether it is the first chain for the given covariate
       # both indicators are to be shared with other functions
       
+      white_out <- whiten(conditional_law.covariance, linear_part, b, conditional_law.mean)
+      forward_map <- white_out$forward_map
+      inverse_map <- white_out$inverse_map
+      new_A <- white_out$new_A
+      new_b <- white_out$new_b
+      white_Y <- forward_map(initial)
+      white_eta <- forward_map(conditional_law.covariance %*% eta)
+      if (max (new_A %*% white_Y - new_b) > 0) stop("Constraints not fulfilled after whitening")
+      
       # get a sample of points fulfilling all constraints
-      Z <- sample_from_constraints(conditional_law.covariance, linear_part, b,
-                                   conditional_law.mean, initial, eta, ndraw = ndraw,
+      Z <- sample_from_constraints(new_A, new_b, white_Y, white_eta, ndraw = ndraw,
                                    burnin = burnin, how_often = 10, verbose = verbose)
+      Z <- t(inverse_map(t(Z)))
       
       etasign <- t(t(eta)*sign(beta[chosen[group.vars]]))
       continue <- FALSE
@@ -723,9 +732,10 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
           # if potentially significant
           if (verbose) print("Checking significance with longer chain")
           ft <<- FALSE
-          Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                       Z[lennull, ], eta, ndraw=2 * max(min_size, ndraw), burnin=0,
+          Z <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
+                                       ndraw = 2 * max(min_size, ndraw), burnin=0,
                                        how_often = 10, verbose = verbose)
+          Z <- t(inverse_map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
           # if significance is contradicting on the two parts
@@ -734,9 +744,10 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
             print(paste("Adding", 2 * max(min_size, ndraw), "draws"))
           }
           ft <<- FALSE
-          Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                        Z[lennull, ], eta, ndraw=2 * max(min_size, ndraw), burnin = 0,
+          Zn <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
+                                        ndraw = 2 * max(min_size, ndraw), burnin = 0,
                                         how_often = 10, verbose = verbose)
+          Zn <- t(inverse_map(t(Zn)))
           Z <- rbind(Z, Zn)
           continue <- FALSE
         }
