@@ -351,13 +351,15 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       if (return.selmodels) {
         if (icf==2) {
           keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
-                    "pvals", "pvals.current", "which.gamma", "sel.models","ls","icf")
+                    "pvals", "pvals.current", "which.gamma", "sel.models", "FWER","ls","icf")
           rm(list = setdiff(names(environment()), keep))
         }
       }
+      method = "multi.carve"
+      if (icf == 2) method = "multi.split"
       ls[[icf]] <- structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                                  gamma.min = gamma[which.gamma], sel.models = sel.models,
-                                  method = "multi.split", call = match.call()), class = "hdi")
+                                  gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
+                                  method = method, call = match.call()), class = "carve")
       
     }
     return(ls)
@@ -385,12 +387,12 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       pvals <- NA
     if (return.selmodels) {
       keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
-                "pvals", "pvals.current", "which.gamma", "sel.models")
+                "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
       rm(list = setdiff(names(environment()), keep))
     }
     structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                   gamma.min = gamma[which.gamma], sel.models = sel.models,
-                   method = "multi.split", call = match.call()), class = "hdi")
+                   gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
+                   method = "multi.carve", call = match.call()), class = "carve")
   }
 }
 
@@ -838,12 +840,12 @@ multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian"
     pvals <- NA
   if (return.selmodels) {
     keep <- c("return.selmodels", "x", "y", "gamma", "inf.out", 
-              "pvals", "pvals.current", "which.gamma", "sel.models")
+              "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
     rm(list = setdiff(names(environment()), keep))
   }
   structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                 gamma.min = gamma[which.gamma], 
-                 sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                 gamma.min = gamma[which.gamma], FWER = FWER,
+                 sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
 }
 
 multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.95, model.selector = lasso.cvcoef,
@@ -1218,7 +1220,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
         if (icf == 2) {
           keep <- c("return.selmodels", "x", "y", "gamma", "split.out",
                     "pvals", "pvals.current", "which.gamma", "sel.models",
-                    "ls", "icf", "ci.level", "estimates",
+                    "ls", "icf", "ci.level", "estimates", "FWER",
                     "lci.current", "uci.current", "vlo", "vup", "sescarve", "ses")
           rm(list = setdiff(names(environment()), keep))
         }
@@ -1226,13 +1228,13 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       if (icf == 1) {
         ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
                                     ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve, centers = estimates,
-                                    uci = uci.current, gamma.min = gamma[which.gamma], 
-                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                                    uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
+                                    sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
       } else {
         ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals,
                                     ci.level = ci.level, lci =  lci.current, ses=ses,
-                                    uci = uci.current, gamma.min = gamma[which.gamma],
-                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                                    uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
+                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "carve")
       }
     }
     return(ls)
@@ -1276,15 +1278,15 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       pvals <- NA
     names(lci.current) <- names(uci.current) <- names(pvals.current)
     if (return.selmodels) {
-      keep <- c("return.selmodels", "x", "y", "gamma", "split.out", 
+      keep <- c("return.selmodels", "x", "y", "gamma", "split.out", "FWER",
                 "pvals", "pvals.current", "which.gamma", "sel.models", "ci.level", 
                 "lci.current", "uci.current", "vlo", "vup", "sescarve", "estimates")
       rm(list = setdiff(names(environment()), keep))
     }
     structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
                    ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve, centers = estimates,
-                   uci = uci.current, gamma.min = gamma[which.gamma], 
-                   sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+                   uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
+                   sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
   }
 }
 
@@ -1683,4 +1685,30 @@ pval.creator <- function(beta, gamma, vlo, vup, centers, ses, s0 = NA, multi.cor
   }
   pval <- pval.aggregator(list(as.matrix(pvals, ncol = 1)), gamma)
   return(pval)
+}
+
+print.carve <- function(x){
+  if (is.list(x)) {
+    if (x$method == "multi.carve") {
+      cat("Result from multicarving \n")
+    } else if (x$method == "multi.split"){
+      cat("Result from multisplitting \n")
+    }
+    cat("alpha = 0.01:")
+    cat(" Selected predictors:", which(x$pval.corr <= 0.01), 
+        "\n")
+    cat("alpha = 0.05:")
+    cat(" Selected predictors:", which(x$pval.corr <= 0.05), 
+        "\n")
+    cat("------\n")
+    if (isTRUE(x$FWER)){
+      cat("Familywise error rate controlled at level alpha.\n")
+    } else if (isFALSE(x$FWER)){
+      cat("Single variable error rate controlled at level alpha.\n")
+      cat("No multiplicity correction applied.\n")
+    }
+   
+  } else {
+    print.default(x)
+  }
 }
