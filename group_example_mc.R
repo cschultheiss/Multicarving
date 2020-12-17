@@ -58,9 +58,9 @@ truebeta <- rep(0, p)
 # delta_vec <- seq(0, 0.06, 0.02)
 # n_vec <- c(250, 350, 500, 800)
 # sparse alternative
-delta_vec <- c(0.2) # seq(0, 0.5, 0.1)
-n_vec <- c(250) #c(250, 350, 500)
-frac_vec <- c(0.5) #c(0.5, 0.75, 0.9, 0.95, 0.99, 1)
+delta_vec <- seq(0, 0.5, 0.1)
+n_vec <- c(250, 350, 500)
+frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99, 1)
 B_vec <- c(1, (1:5) * 10)
 b_vec <- B_vec
 nsim <- 200
@@ -82,8 +82,7 @@ progress <- function(n, tag) {
 }
 RNGkind("L'Ecuyer-CMRG")
 set.seed(42) 
-seed_v <- sample(1:10000,length(frac_vec)*length(delta_vec)*length(n_vec)+12)
-seed_v <- seed_v[-c(1:12)]
+seed_v <- sample(1:10000,length(frac_vec)*length(delta_vec)*length(n_vec))
 print(seed_v) # 3588 3052 2252 5257 8307 ...
 seed_n <- 0
 
