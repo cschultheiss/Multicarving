@@ -212,10 +212,20 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       ft <<- TRUE # indicator whether it is the first chain for the given covariate
       # both indicators are to be shared with other functions
       
+      white_out <- whiten(conditional_law.covariance, linear_part, b, conditional_law.mean)
+      forward_map <- white_out$forward_map
+      inverse_map <- white_out$inverse_map
+      new_A <- white_out$new_A
+      new_b <- white_out$new_b
+      white_Y <- forward_map(initial)
+      white_eta <- forward_map(conditional_law.covariance %*% eta)
+      if (max (new_A %*% white_Y - new_b) > 0) stop("Constraints not fulfilled after whitening")
+      
       # get a sample of points fulfilling all constraints
-      Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                  initial, eta, ndraw = ndraw, burnin = burnin,
-                                  how_often = 10, verbose = verbose)
+      Z <- sample_from_constraints(new_A, new_b,
+                                   white_Y, white_eta, ndraw = ndraw, burnin = burnin,
+                                   how_often = 10, verbose = verbose)
+      Z <- t(inverse_map(t(Z)))
       continue <- FALSE
       i <- 0
       while (!continue) {
@@ -241,9 +251,10 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           if (verbose) {
             print(paste("Increasing ndraw to ", 2 * max(min_size, ndraw), "and burnin to ", ndraw))
           }
-          Z <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                      Z[lennull, ], eta, ndraw = 2 * max(min_size, ndraw), burnin = 0,
-                                      how_often = 10, verbose = verbose)
+          Z <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
+                                       ndraw = 2 * max(min_size, ndraw), burnin = 0,
+                                       how_often = 10, verbose = verbose)
+          Z <- t(inverse_map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
           # if significance is contradicting on the two parts
@@ -252,9 +263,11 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           if (verbose) {
             print(paste("Adding", 2 * max(min_size, ndraw), "draws"))
           }
-          Zn <- sample_from_constraints(conditional_law.covariance, linear_part, b, conditional_law.mean,
-                                       Z[lennull, ], eta, ndraw = 2 * max(min_size, ndraw), burnin = 0,
-                                       how_often = 10, verbose = verbose)
+          Zn <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
+                                        ndraw = 2 * max(min_size, ndraw), burnin = 0,
+                                        how_often = 10, verbose = verbose)
+          
+          Zn <- t(inverse_map(t(Zn)))
           Z <- rbind(Z, Zn)
           continue <- FALSE
         }
@@ -406,7 +419,7 @@ whiten <- function(cov, linear_part, b, mmean) {
 }
 
 
-sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_interest,
+sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_interest,
                             how_often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
                             use_constraint_directions = TRUE, verbose = FALSE) {
   # routine to do whitening, activate the sampler, and recolour the samples
@@ -414,22 +427,12 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
     how_often <- ndraw + burnin
   }
   
-  white_out <- whiten(cov, linear_part, b, mmean)
-  forward_map <- white_out$forward_map
-  inverse_map <- white_out$inverse_map
-  new_A <- white_out$new_A
-  new_b <- white_out$new_b
-  white_Y <- forward_map(Y)
-  if (max (new_A %*% white_Y - new_b) > 0) stop("Constraints not fulfilled after whitening")
   if (skip) {
     # if Hamiltonian sampler got stuck before for same set-up do not try again
-    white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
     #  sample from whitened points with new constraints
-    white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
+    Z <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
                                            how_often = how_often, ndraw = ndraw, burnin = burnin,
                                            sigma = 1, use_A = use_constraint_directions)
-    # recolour the withened samples
-    Z <- t(inverse_map(t(white_samples)))
   } else {
     # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
     # current wrap around is not windows supported
@@ -445,17 +448,12 @@ sample_from_constraints <- function(cov, linear_part, b, mmean, Y, direction_of_
         first_text <- "this variable was not tested for the first time"
       }
       warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
-      white_direction_of_interest <- forward_map(cov %*% direction_of_interest)
       #  sample from whitened points with new constraints
-      white_samples <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
+      Z <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
                                               how_often = how_often, ndraw = ndraw, burnin = burnin,
                                               sigma = 1, use_A = use_constraint_directions)
-      # recolour the withened samples
-      Z <- t(inverse_map(t(white_samples)))
     } else {
-      white2 <- trywhite$value
-      # recolour the withened samples
-      Z <- t(inverse_map(t(white2)))
+      Z <- trywhite$value
     }
     
   }
