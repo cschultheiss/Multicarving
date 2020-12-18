@@ -443,9 +443,9 @@ sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_in
     if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
       skip <<- TRUE
       if (ft){
-        first_text <- "this variable was tested for the first time"
+        first_text <- "this variable was tested for the first time;"
       } else {
-        first_text <- "this variable was not tested for the first time"
+        first_text <- "this variable was not tested for the first time;"
       }
       warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
       #  sample from whitened points with new constraints

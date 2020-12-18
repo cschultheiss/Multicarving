@@ -357,7 +357,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       }
       method = "multi.carve"
       if (icf == 2) method = "multi.split"
-      ls[[icf]] <- structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
+      ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
                                   gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
                                   method = method, call = match.call()), class = "carve")
       
@@ -390,15 +390,15 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
                 "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
       rm(list = setdiff(names(environment()), keep))
     }
-    structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
+    structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
                    gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
                    method = "multi.carve", call = match.call()), class = "carve")
   }
 }
 
 carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", args.model.selector = list(intercept = TRUE, standardize = FALSE, tol.beta = 1e-5),
-                      return.selmodels = FALSE, verbose = FALSE, FWER = FALSE, estimate.sigma = TRUE, df.corr = FALSE,
-                      args.lasso.inference = list(sigma = NA,intercept = TRUE)) {
+                      return.selmodels = FALSE, verbose = FALSE, FWER = TRUE, estimate.sigma = TRUE, df.corr = FALSE,
+                      args.lasso.inference = list(sigma = NA)) {
 
   args.model.selector$family <- family
   args.lasso.inference$family <- family
@@ -554,11 +554,11 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
   
   if (return.selmodels) {
     keep <- c("return.selmodels", "x", "y", 
-              "pvals", "sel.models")
+              "pvals", "sel.models", "FWER")
     rm(list = setdiff(names(environment()), keep))
   }
-  structure(list(pval.corr = pvals,
-                 sel.models = sel.models, method = "multi.split", call = match.call()), class = "hdi")
+  structure(list(pval.corr = pvals, FWER= FWER,
+                 sel.models = sel.models, method = "carve100", call = match.call()), class = "carve")
 }
 
 multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian",
@@ -843,9 +843,9 @@ multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian"
               "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
     rm(list = setdiff(names(environment()), keep))
   }
-  structure(list(pval = NA, pval.corr = pvals.current, pvals.nonaggr = pvals, 
+  structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
                  gamma.min = gamma[which.gamma], FWER = FWER,
-                 sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
+                 sel.models = sel.models, method = "multi.carve.group", call = match.call()), class = "carve")
 }
 
 multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.95, model.selector = lasso.cvcoef,
@@ -1689,22 +1689,40 @@ pval.creator <- function(beta, gamma, vlo, vup, centers, ses, s0 = NA, multi.cor
 
 print.carve <- function(x){
   if (is.list(x)) {
-    if (x$method == "multi.carve") {
+    if (isTRUE(x$method == "multi.carve" || x$method == "multi.carve.group")) {
       cat("Result from multicarving \n")
-    } else if (x$method == "multi.split"){
+    } else if (isTRUE(x$method == "multi.split")){
       cat("Result from multisplitting \n")
+    } else if (isTRUE(x$method == "carve100")){
+      cat("Result from carve 100 \n")
+    } else {
+      return (print.default(x))
     }
-    cat("alpha = 0.01:")
-    cat(" Selected predictors:", which(x$pval.corr <= 0.01), 
-        "\n")
-    cat("alpha = 0.05:")
-    cat(" Selected predictors:", which(x$pval.corr <= 0.05), 
-        "\n")
+    if (x$method == "multi.carve.group"){
+      cat("alpha = 0.01:")
+      cat(" Selected predictor groups:", which(x$pval.corr <= 0.01), 
+          "\n")
+      cat("alpha = 0.05:")
+      cat(" Selected predictor groups:", which(x$pval.corr <= 0.05), 
+          "\n")
+    } else {
+      cat("alpha = 0.01:")
+      cat(" Selected predictors:", which(x$pval.corr <= 0.01), 
+          "\n")
+      cat("alpha = 0.05:")
+      cat(" Selected predictors:", which(x$pval.corr <= 0.05), 
+          "\n")
+    }
+
     cat("------\n")
     if (isTRUE(x$FWER)){
       cat("Familywise error rate controlled at level alpha.\n")
     } else if (isFALSE(x$FWER)){
-      cat("Single variable error rate controlled at level alpha.\n")
+      if (x$method == "multi.carve.group"){
+        cat("Single group error rate controlled at level alpha.\n")
+      } else {
+        cat("Single variable error rate controlled at level alpha.\n")
+      }
       cat("No multiplicity correction applied.\n")
     }
    
