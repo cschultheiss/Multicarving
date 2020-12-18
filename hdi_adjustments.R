@@ -7,9 +7,9 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
                             gamma = ((1:B)/B)[((1:B)/B) >= 0.05],
                             family = "gaussian",
                             args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                            se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
+                            se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
                             args.classical.fit = list(ttest = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE, skip.variables = TRUE,
-                            verbose = FALSE, FWER = TRUE, split_pval= TRUE,
+                            verbose = FALSE, FWER = TRUE, split.pval= TRUE,
                             args.lasso.inference = list(sigma = NA, sig_Level = 0.05, FWER = FWER, aggregation = min(gamma))) {
   # routine to split the data, select a model and calculate carving p-values B times
   # x: matrix of predictors
@@ -29,7 +29,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   # skip.variables: shall carving p-values for variables selected less than min(gamma)*B times be omitted
   # verbose: whether to print key steps
   # FWER: shall a FWER correction be applied
-  # split_pval: shall p-values for splitting be determined as well
+  # split.pval: shall p-values for splitting be determined as well
   # args.lasso.inference: additional arguments for inference after Lasso
   
   
@@ -187,7 +187,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   }
   
   oneSplit_infer<- function(sel) {
-    if (split_pval) {
+    if (split.pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
     } else {
       pvals.v <- rep(1, p)
@@ -203,7 +203,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       if (length(beta) == p + 1) beta <- beta[-1]
       if (args.model.selector$intercept){
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel - 1
         } else {
           den <- n
@@ -211,7 +211,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
         sigma_model <- sqrt(RSS / den)
       } else {
         RSS <- sum((y- x %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel
         } else {
           den <- n
@@ -253,7 +253,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       } else {
         sel.pval1 <- pmin(sel.pval1, 1) # for FCR
       }
-      if (split_pval) {
+      if (split.pval) {
         x.right <- x[-split, ]
         y.right <- y[-split]
         if (args.model.selector$intercept) {
@@ -315,7 +315,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
     matrix(unlist(lapply(inf.out, "[[", name)), nrow = B, 
            byrow = TRUE)
   }
-  if (split_pval) { 
+  if (split.pval) { 
     ls <- list()
     pvalsall <- array(unlist(lapply(inf.out, "[[", "pvals")), dim = c(2, p, B))
     for (icf in  1:2) {
@@ -561,12 +561,12 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
                  sel.models = sel.models, method = "carve100", call = match.call()), class = "carve")
 }
 
-multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian",
+multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, family = "gaussian",
                                model.selector = lasso.cvcoef, parallel = FALSE, ncores = getOption("mc.cores", 2L),
                                gamma = ((1:B)/B)[((1:B)/B) >= 0.05], args.model.selector = list(intercept = TRUE, standardize = FALSE),
                                return.nonaggr = FALSE, return.selmodels = FALSE, skip.groups = TRUE,
-                               se.estimator = "1se", args.se.estimator = list(df_corr = FALSE, intercept = TRUE, standardize = FALSE),
-                               verbose = FALSE, FWER = FALSE, groups,
+                               se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
+                               verbose = FALSE, FWER = FALSE,
                                args.lasso.inference = list(sigma = NA, sig_Level = 0.05, FWER = FWER, aggregation = min(gamma))) {
   args.lasso.inference$family <- family
   args.model.selector$family <- family
@@ -740,7 +740,7 @@ multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian"
       if (length(beta) == p + 1) beta <- beta[-1]
       if (args.model.selector$intercept){
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel - 1
         } else {
           den <- n
@@ -748,7 +748,7 @@ multi.carve_group <- function (x, y, B = 50, fraction = 0.9, family = "gaussian"
         sigma_model <- sqrt(RSS / den)
       } else {
         RSS <- sum((y- x %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel
         } else {
           den <- n
@@ -852,10 +852,10 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
                                      classical.fit = lm.pval, parallel = FALSE, ncores = getOption("mc.cores", 2L),
                                      gamma = ((1:B)/B)[((1:B)/B) >= 0.05], family = "gaussian",
                                      args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                                     se.estimator = "modwise", args.se.estimator = list(df_corr = TRUE, intercept = TRUE, standardize = FALSE),
+                                     se.estimator = "modwise", args.se.estimator = list(df.corr = TRUE, intercept = TRUE, standardize = FALSE),
                                      args.classical.fit = NULL, args.classical.ci = NULL, return.nonaggr = FALSE, 
                                      return.selmodels = FALSE, verbose = FALSE, ci.timeout = 10,
-                                     FWER = FALSE, split_pval = TRUE, ttest = TRUE,
+                                     FWER = FALSE, split.pval = TRUE, ttest = TRUE,
                                      args.lasso.inference = list(sigma = NA)) {
 
   args.model.selector$family <- family
@@ -885,7 +885,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
   n.right <- n - n.left
   stopifnot(n.left >= 1, n.right >= 0)
   oneSplit <- function(b) {
-    if (split_pval) {
+    if (split.pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
     } else {
       pvals.v <- rep(1, p)
@@ -999,7 +999,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       if (length(beta) == p + 1) beta <- beta[-1]
       if (args.model.selector$intercept){
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel - 1
         } else {
           den <- n
@@ -1007,7 +1007,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
         sigma_model <- sqrt(RSS / den)
       } else {
         RSS <- sum((y- x %*% beta) ^ 2)
-        if (args.se.estimator$df_corr) {
+        if (args.se.estimator$df.corr) {
           den <- n - p.sel
         } else {
           den <- n
@@ -1058,7 +1058,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       } else {
         sel.pval1 <- pmin(sel.pval1, 1) # for FCR
       }
-      if (split_pval) {
+      if (split.pval) {
         x.right <- x[-split, ]
         y.right <- y[-split]
         if (args.model.selector$intercept) {
@@ -1150,7 +1150,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
     matrix(unlist(lapply(split.out, "[[", name)), nrow = B, 
            byrow = TRUE)
   }
-  if (split_pval) { 
+  if (split.pval) { 
     ls <- list()
     pvalsall <- array(unlist(lapply(split.out, "[[", "pvals")), dim = c(2, p, B))
     for (icf in  1:2) {
@@ -1377,7 +1377,7 @@ fixedLasso.modelselector<-function(x, y, lambda, tol.beta, thresh = 1e-7, exact 
   return(list(sel.model = chosen, beta = beta, lambda = lambda))
 }
 
-estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df_corr = FALSE) {
+estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use_lambda.min = FALSE, df.corr = FALSE) {
   selectiveInference:::checkargs.xy(x, rep(0, nrow(x)))
   if (nrow(x) < 10) 
     stop("Number of observations must be at least 10 to run estimateSigma")
@@ -1389,7 +1389,7 @@ estimateSigma.flex <- function (x, y, intercept = TRUE, standardize = FALSE, use
   nz <- sum(predict(fit, s = lamhat, type = "coef") != 
              0)
   den <- length(y)
-  if (df_corr) {
+  if (df.corr) {
     den <- den - nz
   }
 
