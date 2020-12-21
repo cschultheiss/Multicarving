@@ -167,7 +167,7 @@ for (frac in frac_vec) {
   tic()
   res<-foreach(gu=1:nsim, .combine = rbind,
                .packages = c("MASS","selectiveInference","glmnet","Matrix",
-                             "hdi","tmg","truncnorm"),.options.snow=opts) %dorng%{
+                             "hdi","tmg","truncnorm", "tictoc"),.options.snow=opts) %dorng%{
   # alternative if sequential computation is preferred
   # res<-foreach(gu=1:nsim,.combine = rbind) %do%{
 
@@ -195,7 +195,7 @@ for (frac in frac_vec) {
                                        ncores = getOption("mc.cores", 2L), # aggregate outside to test different methods
                                        args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use_lambda.min = FALSE),
                                        args.classical.fit = list(Sigma = reported_sigma, ttest = FALSE), verbose = FALSE,
-                                       FWER = FALSE, split_pval = TRUE, return.selmodels = TRUE, return.nonaggr = TRUE,
+                                       FWER = FALSE, split.pval = TRUE, return.selmodels = TRUE, return.nonaggr = TRUE,
                                        args.lasso.inference = list(sigma = reported_sigma,
                                                                                              verbose = TRUE, selected = TRUE)), 0)
     c100try <- tryCatch_W_E(carve100(x, y, model.selector = lasso.cvcoef,

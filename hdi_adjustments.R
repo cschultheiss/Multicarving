@@ -331,8 +331,6 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       for (j in 1:p) {
         if (any(!is.na(pvals[, j]))) {
           quant.gamma <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 3) / gamma
-          quant.gamma1 <- quantile(pvals[, j], gamma, na.rm = TRUE, type = 1) / gamma
-          if (min(quant.gamma) < min (quant.gamma1)) warning(paste("Could reduce p-value for variable", j,  "with other quantile function"))
           penalty <- if (length(gamma) > 1) 
             (1 - log(min(gamma)))
           else 1

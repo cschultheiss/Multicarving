@@ -437,9 +437,13 @@ sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_in
     # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
     # current wrap around is not windows supported
     nw <- length(white_Y)
+    tic()
     trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
                                                      -new_A, as.vector(new_b), burn.in = burnin)},
                                                timeout = 6, on_timeout = "error"), 0)
+    time <- toc(quiet = TRUE)
+    time_diff <- round(time$toc - time$tic, 4)
+    nconstraint <- dim(new_A)[1]
     if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
       skip <<- TRUE
       if (ft){
@@ -447,12 +451,14 @@ sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_in
       } else {
         first_text <- "this variable was not tested for the first time;"
       }
+      warning(paste("Hamiltonian not successful after", time_diff, "for", ndraw/2, "samples,", nw, "dimensions and", nconstraint, "constraints"))
       warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first_text, "using hit-and-run sampler"))
       #  sample from whitened points with new constraints
       Z <- sample_truncnorm_white(new_A, new_b, white_Y, white_direction_of_interest,
                                               how_often = how_often, ndraw = ndraw, burnin = burnin,
                                               sigma = 1, use_A = use_constraint_directions)
     } else {
+      warning(paste("Hamiltonian successful after", time_diff, "for", ndraw/2, "samples,", nw, "dimensions and", nconstraint, "constraints"))
       Z <- trywhite$value
     }
     
