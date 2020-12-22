@@ -221,7 +221,7 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
       args.classical.fit$Sigma <- sigma.model
     }
     if (p.sel > 0) {
-      fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
+      fLItry <- tryCatch_W_E(do.call(carve.lasso, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
                                                                       lambda = lambda, intercept = args.model.selector$intercept, which.check = which.check),
                                                                  args.lasso.inference)), 0)
       if (!is.null(fLItry$error)) {
@@ -753,7 +753,7 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, family = "g
       args.lasso.inference$sigma <- sigma.model
     }
     if (ngrouptested > 0) {
-      fLItry <- tryCatch_W_E(do.call(OptimalFixedLassoGroup, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
+      fLItry <- tryCatch_W_E(do.call(carve.lasso.group, args = c(list(X = x, y = y, ind = split, beta = beta, tol.beta = 0,
                                                                       lambda = lambda, intercept = args.model.selector$intercept, groups = groups, which.check = which.check),
                                                                  args.lasso.inference)), 0)
       if (!is.null(fLItry$error)) {
@@ -1013,7 +1013,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
     }
       
     if (p.sel > 0) {
-      fLItry <- tryCatch_W_E(do.call(OptimalFixedLasso,
+      fLItry <- tryCatch_W_E(do.call(carve.lasso,
                                      args = c(list(X = x, y = y,ind = split, beta = beta, tol.beta = 0,
                                                    lambda = lambda, intercept = args.model.selector$intercept,
                                                    selected = FALSE), args.lasso.inference)), 0)

@@ -3,7 +3,7 @@
 # the sampler is defined elsewhere
 
 
-OptimalFixedLasso<-function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian",
+carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian",
                             intercept = TRUE, ndraw = 8000, burnin = 2000, sig.level = 0.05,
                             FWER = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE, which.check = NULL, time.constant = 1e-6) {
   # to be applied after Lasso Selection
@@ -469,7 +469,7 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
 }
 
 
-OptimalFixedLassoGroup <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian", groups,
+carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian", groups,
                                    intercept = TRUE, ndraw = 8000, burnin = 2000,
                                    sig.level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE, which.check = NULL) {
   # to be applied after Lasso Selection
