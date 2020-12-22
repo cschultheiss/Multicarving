@@ -212,7 +212,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, fam
       ft <<- TRUE # indicator whether it is the first chain for the given covariate
       # both indicators are to be shared with other functions
       
-      white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean)
+      white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean, rank = DOF)
       forward.map <- white.out$forward.map
       inverse.map <- white.out$inverse.map
       new.A <- white.out$new.A
@@ -381,15 +381,14 @@ conditional<-function(S, mean, C, d) {
 }
 
 
-whiten <- function(cov, linear.part, b, mmean) {
+whiten <- function(cov, linear.part, b, mmean, rank = NULL) {
   #   Return a whitened version of constraints in a different
   #   basis, and a change of basis matrix.
 
   # calculate a root of the covariance matrix using EVD
-  rank <- rankMatrix(cov)[1]
+  if (is.null(rank)) rank <- rankMatrix(cov)[1]
   ev <- eigen(cov)
   D1 <- ev$values
-  # rank <- sum(abs(D1)> 1e-5 * abs(D1[1]))
   U <- ev$vectors
   Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
   while (!is.null(Dtry$warning)) {
@@ -470,7 +469,7 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
 }
 
 
-OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian", groups,
+OptimalFixedLassoGroup <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian", groups,
                                    intercept = TRUE, ndraw = 8000, burnin = 2000,
                                    sig.level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE, which.check = NULL) {
   # to be applied after Lasso Selection
@@ -706,7 +705,7 @@ OptimalFixedLassoGroup <- function(X, y, ind, beta, sigma = NULL, tol.beta, lamb
       ft <<- TRUE # indicator whether it is the first chain for the given covariate
       # both indicators are to be shared with other functions
       
-      white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean)
+      white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean, rank = DOF)
       forward.map <- white.out$forward.map
       inverse.map <- white.out$inverse.map
       new.A <- white.out$new.A
