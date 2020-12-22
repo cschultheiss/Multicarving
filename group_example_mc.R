@@ -83,16 +83,13 @@ for (n in n.vec) {
       print(n)
       print(frac)
       print(B)
-      if (local) {
-        pb <- tkProgressBar(max = ntasks, title = paste("split=", frac))
-      }
       opts <- list(progress = progress)
       
-      if (local) {
-        cl<-makeSOCKcluster(4)
-      } else {
-        cl<-makeSOCKcluster(16) 
-      }
+
+      # parallelization
+      # choose different number of cores if wished
+      cl<-makeSOCKcluster(16) 
+
       rseed <- seed.vec[seed.n]
       clusterSetRNGStream(cl, iseed = rseed) # make things reproducible
       registerDoSNOW(cl)
