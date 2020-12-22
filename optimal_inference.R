@@ -5,7 +5,7 @@
 
 OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, family = "gaussian",
                             intercept = TRUE, ndraw = 8000, burnin = 2000, sig_Level = 0.05,
-                            FWER = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE, which.check = NULL) {
+                            FWER = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE, which.check = NULL, time.constant = 1e-6) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
@@ -224,7 +224,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
       # get a sample of points fulfilling all constraints
       Z <- sample_from_constraints(new_A, new_b,
                                    white_Y, white_eta, ndraw = ndraw, burnin = burnin,
-                                   how_often = 10, verbose = verbose)
+                                   how_often = 10, verbose = verbose, time.constant = time.constant)
       Z <- t(inverse_map(t(Z)))
       continue <- FALSE
       i <- 0
@@ -253,7 +253,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           }
           Z <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
                                        ndraw = 2 * max(min_size, ndraw), burnin = 0,
-                                       how_often = 10, verbose = verbose)
+                                       how_often = 10, verbose = verbose, time.constant = time.constant)
           Z <- t(inverse_map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig_Level && max(pval1, pval2) > 1.5 * sig_Level) {
@@ -265,7 +265,7 @@ OptimalFixedLasso<-function(X, y, ind, beta, sigma = NULL, tol.beta, lambda, fam
           }
           Zn <- sample_from_constraints(new_A, new_b, forward_map(Z[lennull, ]), white_eta,
                                         ndraw = 2 * max(min_size, ndraw), burnin = 0,
-                                        how_often = 10, verbose = verbose)
+                                        how_often = 10, verbose = verbose, time.constant = time.constant)
           
           Zn <- t(inverse_map(t(Zn)))
           Z <- rbind(Z, Zn)
@@ -421,7 +421,7 @@ whiten <- function(cov, linear_part, b, mmean) {
 
 sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_interest,
                             how_often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
-                            use_constraint_directions = TRUE, verbose = FALSE) {
+                            use_constraint_directions = TRUE, verbose = FALSE, time.constant = 1e-6) {
   # routine to do whitening, activate the sampler, and recolour the samples
   if (how_often < 0) {
     how_often <- ndraw + burnin
@@ -437,14 +437,16 @@ sample_from_constraints <- function(new_A, new_b, white_Y, white_direction_of_in
     # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
     # current wrap around is not windows supported
     nw <- length(white_Y)
+    nconstraint <- dim(new_A)[1]
+    nsample <- ndraw / 2 + burnin
+    time_factor <- nw * nconstraint * nsample
+    time_limit <- time_factor * time.constant
     tic()
     trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white_Y,
                                                      -new_A, as.vector(new_b), burn.in = burnin)},
-                                               timeout = 6, on_timeout = "error"), 0)
+                                               timeout = time_limit, on_timeout = "error"), 0)
     time <- toc(quiet = TRUE)
     time_diff <- round(time$toc - time$tic, 4)
-    nconstraint <- dim(new_A)[1]
-    nsample <- ndraw / 2 + burnin
     if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
       skip <<- TRUE
       if (ft){
