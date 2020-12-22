@@ -1,6 +1,5 @@
 rm(list = ls(all = TRUE))
-local <- FALSE # on local machine or on D-MATH server
-save <- FALSE
+save <- TRUE
 if (!save && !local) {
   save <- TRUE
   warning("Do not use cluster without saving, save was set to TRUE")
@@ -8,11 +7,7 @@ if (!save && !local) {
 # create save location, adjust depending on folder structure
 if (save) {
   newdir <- format(Sys.time(), "%d-%b-%Y %H.%M")
-  if (local) {
-    dir.create(paste("C:/Users/Christoph/Documents/ETH/MA/R_trials/multi_carve/", newdir, sep = ""))
-  } else {
-    dir.create(paste("multi_carve/",newdir,sep="")) 
-  }
+  dir.create(paste("multi_carve/",newdir,sep="")) 
 }
 
 require(MASS)
@@ -32,23 +27,12 @@ commit <- revparse_single(revision = "HEAD")
 print(paste("Run on commit", commit$sha, 'i.e.:', commit$summary))
 
 
-if (local) {
-  # adjust depending on folder structure
-  source("C:/Users/Christoph/Documents/ETH/MA/R_trials/hdi_adjustments.R")
-  source("C:/Users/Christoph/Documents/ETH/MA/R_trials/optimal_inference.R")
-  source("C:/Users/Christoph/Documents/ETH/MA/R_trials/tryCatch-W-E.R")
-} else {
-  source("hdi_adjustments.R")
-  source("optimal_inference.R")
-  source("tryCatch-W-E.R")
-  source("mutli_restructured.R")
-  source("sample_from_truncated.R")
-}
-
-if (local) {
-  library(tcltk)
-}
-
+# adjust depending on folder structure
+source("hdi_adjustments.R")
+source("optimal_inference.R")
+source("tryCatch-W-E.R")
+source("mutli_restructured.R")
+source("sample_from_truncated.R")
 
 
 # toeplitz
@@ -64,28 +48,17 @@ sparsity <- 5
 set.seed(42) # to make different methods comparable, fix the x-matrix
 x <- mvrnorm(n, rep(0, p), Cov)
 print (x[1,1])
-# should create the right x on D-MATH server, x[1 ,1] = 0.958 for toeplitz 0.6
-# # if x-data is presaved
-# if (local) {
-# load("~/ETH/MA/R_trials/x.RData")
-# } else {
-#   load("x.RData")
-# }
+# should create the right x on D-MATH server, x[1 ,1] = 0.958 for Toeplitz 0.6
 y_true <- x %*% beta
 SNR <- 1.713766 # value created for Toeplitz 0.6
 sigma <- sqrt(drop(var(y_true)) / SNR)
-if (rho==0.6) sigma <- 2
+if (rho == 0.6) sigma <- 2
 report_sigma <- FALSE
 
 # # riboflavin
 # # adjust depending on folder structure
-# if (local) {
-#   riboflavin <- read.csv("C:/Users/Christoph/Documents/ETH/MA/data/riboflavin.csv",
+# riboflavin <- read.csv("riboflavin.csv",
 #                          stringsAsFactors = FALSE)
-# } else {
-#   riboflavin <- read.csv("riboflavin.csv",
-#                          stringsAsFactors = FALSE)
-# }
 # riboflavin.tmp <- t(riboflavin[, -1])
 # colnames(riboflavin.tmp) <- riboflavin[, 1]
 # x <- riboflavin.tmp[, -1]
@@ -97,35 +70,12 @@ report_sigma <- FALSE
 # SNR <- 16
 # sparsity <- 2 # 4 in other set-up
 
-# # geno data, not in Paper
-# # adjust depending on folder structure
-# if (local) {
-#   ind1 <- readRDS("C:/Users/Christoph/Documents/ETH/MA/Data/ind1.rds")
-#   geno <- readRDS("C:/Users/Christoph/Documents/ETH/MA/Data/geno-n600-p1000.rds")
-# } else {
-#   ind1 <- readRDS("ind1.rds")
-#   geno <- readRDS("geno-n600-p1000.rds")
-# }
-# x <- geno[ind1,]
-# rm(geno)
-# rm(ind1)
-# n <- dim(x)[1]
-# p <- dim(x)[2]
-# report_sigma <- FALSE
-# SNR <-2
-# sparsity <- 10
-
 B_vec <- c(1, 50) # c(1, (1:5) * 10) # number of splits
 frac_vec <- c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
 nsim <- 200
 ntasks <- nsim
 progress <- function(n, tag) {
-  mod <- if (local) 4
-  else
-    16
-  if (local) {
-    setTkProgressBar(pb, n)
-  }
+  mod <- 16
   if (n %% mod == 0 ) {
     cat(sprintf('tasks completed: %d; tag: %d\n', n, tag))
   }
@@ -136,42 +86,35 @@ progress <- function(n, tag) {
 }
 RNGkind("L'Ecuyer-CMRG")
 set.seed(42)
-seed_v <- sample(1:10000,length(frac_vec))
+seed_v <- sample(1:10000, length(frac_vec))
 print(seed_v) # 3588 3052 2252 5257 8307
 seed_n <- 0
-usei <- FALSE # should sigma_hat be calculated modelwise, change for Riboflavin
 B <- max(B_vec)
 for (frac in frac_vec) {
-  seed_n <- seed_n+1
+  seed_n <- seed_n + 1
   set.seed(seed_v[seed_n])
   # check set-up
-  print(usei)
   print(frac)
   print(B)
   print(report_sigma)
   print(sigma)
-  if (local) {
-    pb <- tkProgressBar(max = ntasks, title = paste("B=", B, " split=", frac))
-  }
   opts <- list(progress = progress)
   
   # parallelization
-  if (local) {
-    cl<-makeSOCKcluster(4)
-  } else {
-    cl<-makeSOCKcluster(16) 
-  }
+  # choose different number of cores if wished
+  cl<-makeSOCKcluster(16) 
+  
   rseed <- seed_v[seed_n]
   clusterSetRNGStream(cl, iseed = rseed) #make things reproducible
   registerDoSNOW(cl)
   tic()
-  res<-foreach(gu=1:nsim, .combine = rbind,
-               .packages = c("MASS","selectiveInference","glmnet","Matrix",
-                             "hdi","tmg","truncnorm", "tictoc"),.options.snow=opts) %dorng%{
+  res<-foreach(gu = 1:nsim, .combine = rbind,
+               .packages = c("MASS", "selectiveInference", "glmnet", "Matrix",
+                             "hdi", "tmg", "truncnorm", "tictoc"), .options.snow = opts) %dorng%{
   # alternative if sequential computation is preferred
-  # res<-foreach(gu=1:nsim,.combine = rbind) %do%{
+  # res <- foreach(gu = 1:nsim, .combine = rbind) %do%{
 
-    # # Riboflavin or Geno
+    # # Riboflavin
     # beta <- rep(0, p)
     # ind <- sample(1:p, sparsity)
     # beta[ind] <- 1
@@ -184,7 +127,7 @@ for (frac in frac_vec) {
     if (report_sigma) {
       reported_sigma <- sigma
     } else {
-      # not acutally necessary if usei = TRUE
+      # not acutally necessary if sigma is estimated within the routines
       estSigma <- estimateSigma.flex(scale(x, T, F), scale(y, T, F),
                                     intercept = FALSE, standardize = FALSE)
       reported_sigma <- estSigma$sigmahat
@@ -192,14 +135,14 @@ for (frac in frac_vec) {
 
     mcrtry <- tryCatch_W_E(multi.carve(x, y, B = B, fraction = frac, model.selector = lasso.cvcoef,
                                        classical.fit = lm.pval.flex, parallel = FALSE,
-                                       ncores = getOption("mc.cores", 2L), # aggregate outside to test different methods
-                                       args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use_lambda.min = FALSE),
+                                       ncores = getOption("mc.cores", 2L),
+                                       args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use.lambda.min = FALSE),
                                        args.classical.fit = list(Sigma = reported_sigma, ttest = FALSE), verbose = FALSE,
                                        FWER = FALSE, split.pval = TRUE, return.selmodels = TRUE, return.nonaggr = TRUE,
                                        args.lasso.inference = list(sigma = reported_sigma,
                                                                                              verbose = TRUE, selected = TRUE)), 0)
     c100try <- tryCatch_W_E(carve100(x, y, model.selector = lasso.cvcoef,
-                                     args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 1e-5, use_lambda.min = FALSE),
+                                     args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 1e-5, use.lambda.min = FALSE),
                                      verbose = FALSE, FWER = FALSE, return.selmodels = TRUE,
                                      estimate.sigma = FALSE, args.lasso.inference = list(sigma = reported_sigma)), 0)
     
@@ -228,12 +171,13 @@ for (frac in frac_vec) {
       # ommit the clipping to calculate adjusted power
       # pcarve_fwer <- pmin(pcarve_nofwer * model_size, 1)
       # psplit_fwer <- pmin(psplit_nofwer * model_size, 1)
-      pcarve_fwer <- pcarve_nofwer*model_size
-      psplit_fwer <- psplit_nofwer*model_size
+      pcarve_fwer <- pcarve_nofwer * model_size
+      psplit_fwer <- psplit_nofwer * model_size
       c100 <- c100try$value
       pc100_nofwer <- c100$pval.corr
       model_size100 <- sum(c100$sel.models)
       model_size100[model_size100 == 0]  <- 1
+      # ommit the clipping to calculate adjusted power
       # pc100_fwer <- pmin(pc100_nofwer * model_size100, 1)
       pc100_fwer <- pc100_nofwer * model_size100
       
@@ -261,6 +205,7 @@ for (frac in frac_vec) {
           run_res <- c(run_res, true_pv, bad_pv)
         }
         if (B > 1) {
+          # for multicarving, test different aggregation methods
           for (i in 1:np) {
             true_pv <- pvals.aggregated2[[i]][ind]
             bad_pv <- min(pvals.aggregated2[[i]][-ind])
@@ -282,18 +227,18 @@ for (frac in frac_vec) {
           R <- length(which(mcr[[1]]$sel.models[1, ])) # number of variables selected in first split
           TS <- sum(ind %in% which(mcr[[1]]$sel.models[1, ])) # number of active variables selected
           V <- R - TS # number of inactive variables selected
-          carve_err <- sum(pvals.aggregated[[1]][-ind] < 0.05)
-          split_err <- sum(pvals.aggregated[[3]][-ind] < 0.05)
-          carve100_err <- sum(pc100_nofwer[-ind] < 0.05)
+          carve_err <- sum(pvals.aggregated[[1]][-ind] < 0.05) # number of false rejection from single-carving
+          split_err <- sum(pvals.aggregated[[3]][-ind] < 0.05) # number of false rejection from single-splitting
+          carve100_err <- sum(pc100_nofwer[-ind] < 0.05) # number of false rejection from carve100
           run_res <- c(run_res, R, V, TS) 
-          true_pv <- pc100_nofwer[ind]
-          bad_pv <- min(pc100_nofwer[-ind])
-          R100 <- length(which(c100$sel.models))
-          TS100 <- sum(ind %in% which(c100$sel.models))
-          V100 <- R100 - TS100
+          true_pv <- pc100_nofwer[ind] # p-values of active variables
+          bad_pv <- min(pc100_nofwer[-ind]) # lowest p-value of inactive variables to check FWER
           run_res <- c(run_res, true_pv, bad_pv)
           true_pv <- pc100_fwer[ind]
           bad_pv <- min(pc100_fwer[-ind])
+          R100 <- length(which(c100$sel.models)) # number of variables selected using all data
+          TS100 <- sum(ind %in% which(c100$sel.models)) # number of active variables selected
+          V100 <- R100 - TS100 # number of inactive variables selected
           run_res <- c(run_res, true_pv, bad_pv, R100, V100, TS100,
                        carve_err, split_err, carve100_err)
         }
@@ -311,16 +256,17 @@ for (frac in frac_vec) {
   }
   toc()
   stopCluster(cl)
-  if (local) {
-    close(pb)
-  }
+  
   # analyse results for given fraction
+  # get matrix of errors and warnings
   expmatr <- matrix(unlist(res[, "exception"]), nrow = dim(res)[1],
                     ncol = 2, byrow = TRUE)
   print(sum(is.na(expmatr[, 1])))
   succ = which(is.na(expmatr[, 1]))
   print("succesful runs")
+  
   all_y <- matrix(unlist(res[,"y"]), nrow = dim(res), byrow = TRUE)
+  
   for (B in B_vec) {
     if (B == 1) {
       names1 <- c("carve","carvefw", "split", "splitfw")
@@ -334,12 +280,12 @@ for (frac in frac_vec) {
                             "R-V100", "carve_err", "split_err", "carve100_err")
       names <- c(names1, names2)
     } else {
-      names<-c("carve5", "carvefw5", "split5", "splitfw5", "carve30",
+      names <- c("carve5", "carvefw5", "split5", "splitfw5", "carve30",
                "carvefw30", "split30", "splitfw30", "carvefix5",
                "carvefwfix5", "splitfix5", "splitfwfix5", "carvefix30",
                "carvefwfix30", "splitfix30", "splitfwfix30")
       subres <- matrix(unlist(res[,as.character(B)]), nrow = dim(res)[1],
-                       ncol = 16 * (sparsity+1), byrow = TRUE)
+                       ncol = 16 * (sparsity + 1), byrow = TRUE)
       if (any(!is.na(subres[-succ, ]))) print("not as it should be")
       subres <- subres[succ,]
       colnames(subres) <- c(rep(names, each = (sparsity + 1)))
@@ -347,7 +293,7 @@ for (frac in frac_vec) {
     subres <- as.data.frame(subres)
 
     simulation <- list("results" = subres, "exceptions" = expmatr, "y" = all_y, "B" = B, "split" = frac,
-                       "nsim" = nsim, "seed" = rseed, "All used B" = B_vec, "estimated sigma" = usei, "commit" = commit)
+                       "nsim" = nsim, "seed" = rseed, "All used B" = B_vec, "commit" = commit)
     print(paste("results using fraction ", frac, " and B=", B, sep = ""))
     if (B == 1) {
       print(mean(subres$`R-V` == sparsity)) # probability of screening
@@ -376,30 +322,25 @@ for (frac in frac_vec) {
     }
     print("Adjusted")
     print(allrej) # adjusted power
-    print("Unadjusted")
     fwer <- numeric(length(names))
     names(fwer) <- names
     for (name in names) {
       nameind <- which(colnames(subres) == name)
       mat <- subres[, nameind]
-      fwer[as.character(name)] <- mean(mat[,sparsity + 1] < 0.05, na.rm = TRUE)
+      fwer[as.character(name)] <- mean(mat[, sparsity + 1] < 0.05, na.rm = TRUE)
       rejmat <- mat[, 1:sparsity] < 0.05
       allrej[, as.character(name)] <- mean(rejmat, na.rm = TRUE)
     }
+    print("Unadjusted")
     print(fwer) # FWER
     print(allrej) # power
     resname <- paste0("results ", format(Sys.time(), "%d-%b-%Y %H.%M"),
                       " split=", frac, " B=", B, " seed=", rseed)
     # adjust depending on folder structure
-    if (save) {
-      if (local) {
-        save(simulation, file = paste("C:/Users/Christoph/Documents/ETH/MA/R_trials/multi_carve/",
-                                      newdir, "/", resname, ".RData", sep = ""))
-      } else {
-        save(simulation,file = paste("multi_carve/", newdir, "/", resname, ".RData", sep = ""))
-      }
-    }
+    if (save) save(simulation, file = paste("multi_carve/", newdir, "/", resname, ".RData", sep = ""))
+    # end of analysis for given B
   }
+  # end of analysis for given fraction
 }
 
 print("Finale")
