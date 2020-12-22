@@ -262,6 +262,7 @@ for (frac in frac.vec) {
   print("succesful runs")
   
   all.y <- matrix(unlist(res[,"y"]), nrow = dim(res), byrow = TRUE)
+  sd <- attr(res, "rng")
   
   for (B in B.vec) {
     if (B == 1) {
@@ -289,7 +290,7 @@ for (frac in frac.vec) {
     subres <- as.data.frame(subres)
 
     simulation <- list("results" = subres, "exceptions" = expmatr, "y" = all.y, "B" = B, "split" = frac,
-                       "nsim" = nsim, "seed" = rseed, "All used B" = B.vec, "commit" = commit)
+                       "nsim" = nsim, "seed" = rseed, "All used B" = B.vec, "sd" = sd, "commit" = commit)
     print(paste("results using fraction ", frac, " and B=", B, sep = ""))
     if (B == 1) {
       print(mean(subres$`R-V` == sparsity)) # probability of screening
