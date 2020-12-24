@@ -133,7 +133,7 @@ for (frac in frac.vec) {
                                        classical.fit = lm.pval.flex, parallel = FALSE,
                                        ncores = getOption("mc.cores", 2L),
                                        args.model.selector = list(standardize = FALSE, intercept = TRUE, tol.beta = 0, use.lambda.min = FALSE),
-                                       args.classical.fit = list(Sigma = reported.sigma, ttest = FALSE), verbose = FALSE,
+                                       args.classical.fit = list(Sigma = reported.sigma, t.test = FALSE), verbose = FALSE,
                                        FWER = FALSE, split.pval = TRUE, return.selmodels = TRUE, return.nonaggr = TRUE,
                                        args.lasso.inference = list(sigma = reported.sigma,
                                                                                              verbose = TRUE, selected = TRUE)), 0)
