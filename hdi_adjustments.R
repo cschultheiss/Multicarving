@@ -1325,7 +1325,15 @@ lasso.firstqcoef <- function (x, y, q, tol.beta = 0, return.intercept = NULL, ..
   } else {
     return.beta <- beta
   }
-  chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
+  if (coefs[1] != 0) {
+    if (is.character(as.list(match.call())$family) && as.list(match.call())$family == "binomial"){
+      chosen <- which(abs(beta) > tol.beta / sqrt(colSums(x ^ 2))) # model indices
+    } else {
+      chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+    }
+  } else {
+    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
+  }
   return(list(sel.model = chosen, beta = return.beta, lambda = lambda * dim(x)[1]))
 }
 
@@ -1346,7 +1354,11 @@ lasso.cvcoef<-function (x, y, nfolds = 10, grouped = nrow(x) > 3 * nfolds,
     return.beta <- beta
   }
   if (coefs[1] != 0) {
-    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+    if (is.character(as.list(match.call())$family) && as.list(match.call())$family == "binomial"){
+      chosen <- which(abs(beta) > tol.beta / sqrt(colSums(x ^ 2))) # model indices
+    } else {
+      chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+    }
   } else {
     chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
   }
@@ -1364,7 +1376,11 @@ fixedLasso.modelselector <-function(x, y, lambda, tol.beta, thresh = 1e-7, exact
   
   beta <- coefs[2 : (dim(x)[2] + 1)]
   if (coefs[1] != 0) {
-    chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+    if (is.character(as.list(match.call())$family) && as.list(match.call())$family == "binomial"){
+      chosen <- which(abs(beta) > tol.beta / sqrt(colSums(x ^ 2))) # model indices
+    } else {
+      chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(scale(x, T, F) ^ 2 ))) # model indices
+    }
   } else {
     chosen <- which(abs(beta) > tol.beta * sqrt(nrow(x) / colSums(x ^ 2))) # model indices
   }
