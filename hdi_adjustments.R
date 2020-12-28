@@ -1453,7 +1453,7 @@ glm.pval.pseudo <- function(x, y, maxit = 100, delta.start = 0.01, epsilon = 1e-
       }
       incs <- incs + 1
       increase <- TRUE
-      if (delta > 0.1) break("Increased delta too much without success")
+      if (delta > 10 * delta.start) break("Increased delta too much without success")
     } else {
       pvals <- tryfit$value
     }
