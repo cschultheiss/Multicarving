@@ -267,6 +267,11 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
           if (!is.null(sel.pval2try$error)) {
             warning(paste(sel.pval2try$error, "while caluclatng split p-values", sep=" "))
           }
+          if (!is.null(sel.pval2try$warning)) {
+            for (war in unique(sel.pval2try$warning)) {
+              warning(paste(war, sep = " "))
+            }
+          }
           NAs <- FALSE
           if (any(is.na(sel.pval2))) NAs <- TRUE
           # do not stop if splitting leads to NA
@@ -1428,9 +1433,10 @@ lm.pval.flex <- function (x, y, exact = TRUE, intercept = TRUE, Sigma = NA, t.te
   }
 }
 
-glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
+glm.pval.pseudo <- function(x, y, maxit = 100, delta.start = 0.01, epsilon = 1e-06) {
   increase <- TRUE
   incs <- 0
+  delta <- 0
   while (increase) {
     increase <- FALSE
     pi.hat <- max(delta, min(1 - delta, mean(y)))
@@ -1438,20 +1444,22 @@ glm.pval.pseudo<-function(x, y, maxit = 100, delta = 0.01, epsilon = 1e-06) {
     delta.1 <- (1 + pi.hat * delta)/(1 + delta)
     y.tilde <- delta.0 * (1 - y) + delta.1 * y
     pseudo.y <- cbind(y.tilde, 1 - y.tilde)
-    s <- dim(x)[2]
-    str <-paste("pseudo.y~", paste("x[,", 1:s, "]", collapse = "+"), collapse = "")
-    tryfit <- tryCatch_W_E(glm(formula = as.formula(str), family = "binomial", maxit = maxit, epsilon = epsilon), 0)
+    tryfit <- tryCatch_W_E(glm.pval(x = x, y = pseudo.y, family = "binomial", maxit = maxit, epsilon = epsilon), 0)
     if ("glm.fit: fitted probabilities numerically 0 or 1 occurred" %in% tryfit$warning) {
-      delta <- 1.1*delta
-      incs <- incs+1
+      if (incs == 0){
+        delta <- delta.start
+      } else {
+        delta <- 1.1 * delta
+      }
+      incs <- incs + 1
       increase <- TRUE
-      if (delta > 0.1) break("Increased delta too much without succes")
+      if (delta > 0.1) break("Increased delta too much without success")
     } else {
-      fit <- tryfit$value
+      pvals <- tryfit$value
     }
   }
-  if (incs>0) warning(paste("Increased delta to ", delta))
-  return(glm.pval(x, pseudo.y, maxit = maxit, epsilon = epsilon))
+  if (incs > 0) warning(paste("Increased delta to ", delta))
+  return(pvals)
 }
 
 
