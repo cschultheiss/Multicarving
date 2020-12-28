@@ -85,7 +85,7 @@ for (frac in frac.vec) {
   tic()
   res<-foreach(gu = 1:nsim, .combine = rbind,
                .packages = c("MASS", "selectiveInference", "glmnet", "Matrix",
-                             "tmg", "truncnorm", "tictoc") ,.options.snow=opts) %dorng%{
+                             "hdi", "tmg", "truncnorm", "tictoc") ,.options.snow=opts) %dorng%{
   # alternative if sequential computation is preferred
   # res<-foreach(gu = 1:nsim, .combine = rbind) %do%{
 
