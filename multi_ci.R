@@ -44,14 +44,15 @@ beta[sel.index] <- 1
 sparsity <- 5
 set.seed(42) # to make different methods comparable, fix the x-matrix
 x <- mvrnorm(n, rep(0, p), Cov) 
+print (x[1,1])
 # should create the right x on D-MATH server, x[1 ,1] = 0.958
 
 
 y.true <- x %*% beta
 sigma <- 2
 
-frac.vec <- c(0.9) #c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
-nsim <- 20
+frac.vec <- c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
+nsim <- 200
 ntasks <- nsim
 progress <- function(n, tag) {
   mod <- 16
