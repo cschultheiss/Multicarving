@@ -994,7 +994,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.
       if (args.model.selector$intercept){
         RSS <- sum((scale(y, T, F) - scale(x, T, F) %*% beta) ^ 2)
         if (args.se.estimator$df.corr) {
-          den <- n - p.sel
+          den <- n - p.sel - 1
         } else {
           den <- n
         }
