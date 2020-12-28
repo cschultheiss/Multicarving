@@ -50,8 +50,8 @@ x <- mvrnorm(n, rep(0, p), Cov)
 y.true <- x %*% beta
 sigma <- 2
 
-frac.vec <- c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
-nsim <- 200
+frac.vec <- c(0.9) #c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
+nsim <- 20
 ntasks <- nsim
 progress <- function(n, tag) {
   mod <- 16
