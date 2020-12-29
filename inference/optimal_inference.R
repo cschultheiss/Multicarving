@@ -4,27 +4,32 @@
 
 
 carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian",
-                            intercept = TRUE, ndraw = 8000, burnin = 2000, sig.level = 0.05,
-                            FWER = TRUE, aggregation = 0.05, selected = TRUE, verbose = FALSE, which.check = NULL, time.constant = 1e-6) {
+                        intercept = TRUE, which.check = NULL, selected = TRUE, ndraw = 8000, burnin = 2000,
+                        sig.level = 0.05, FWER = TRUE, aggregation = 0.05,  time.constant = 1e-6, verbose = FALSE) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
   # ind: indices used for selection, i.e. Lasso was applied to X[ind, ] and y[ind]
   # beta: coefficients obtained from Lasso selection
-  # sigma: standard deviation, assumed to be known for Gaussian
   # tol.beta tolerance, to assume variable to be active
   # lambda: penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
+  # sigma: standard deviation, assumed to be known for Gaussian
   # family: Gaussian or binomial
-  # ndraw: number of points to draw
+  # intercept: was the model fit using an intercept
+  # which.check: which variables shall be checked (might skip "unimportant" ones)
+  # selected: whether to use the selected viewpoint for aggregation
+  # otherwise no sampling is of need
+  # ndraw: number of points to draw, when using hit-and-run sampler
   # burnin: number of initial points to burn
-  # ndraw and burning might be increased for high the degrees of freedom or due to required significance
+  # ndraw and burning might be increased for high degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
   # sig.level: level for the hypothesis test
   # FWER: whether a FWER correction will be applied
   # aggregation: aggregation parameter \gamma.min
-  # selected: whether to use the selected viewpoint for aggregation
-  # verbose: print some key steps
+  # time.constant: the Hamiltonian sampler is assumed to be stuck, if it does not
+  # finish after (ndraw + burnin) * number of constraints * dimensionality * time.constant seconds
+  # verbose: whether to print key steps
   
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
@@ -360,144 +365,33 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
   }
 }
 
-
-conditional<-function(S, mean, C, d) {
-  # Return an equivalent constraint 
-  # after having conditioned on a linear equality.
-  # Let the inequality constraints be specified by
-  # `(A,b)` and the equality constraints be specified
-  # by `(C,d)`. We form equivalent inequality constraints by 
-  # considering the residual
-  # AY - E(AY|CY=d)
-  # delta.cov and delta.mean are reduction in covariance and mean, due to equality constraint
-  # formula can be generally derived for any such equality constraint
-  C <- matrix(C, ncol = nrow(S))
-  M1 <- tcrossprod(S, C)
-  M2 <- C %*% M1
-  if (is.matrix(M2)) {
-    M2i <- ginv(M2)
-    delta.cov <- M1 %*% tcrossprod(M2i, M1)
-    delta.mean <- M1 %*% M2i %*% (C %*% mean - d)
-  } else {
-    M2i <- 1 / M2
-    delta.cov <- M1 %o% M1 / M2i
-    delta.mean <- M1 * d  / M2i 
-  }
-  return(list(delta.cov = delta.cov, delta.mean = delta.mean))
-}
-
-
-whiten <- function(cov, linear.part, b, mmean, rank = NULL) {
-  #   Return a whitened version of constraints in a different
-  #   basis, and a change of basis matrix.
-
-  # calculate a root of the covariance matrix using EVD
-  if (is.null(rank)) rank <- rankMatrix(cov)[1]
-  ev <- eigen(cov)
-  D1 <- ev$values
-  U <- ev$vectors
-  Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
-  while (!is.null(Dtry$warning)) {
-    warning("Reducing Rank")
-    rank <- rank - 1
-    Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
-  }
-  D <- Dtry$value
-  U <- U[, rank:1]
-  
-  sqrt.cov <- Re(t(t(U)*D))
-  sqrt.inv <- Re(t(U) / D)
-  # get equivalent constraint for whitened vector i.e linear.part%*%y<b <=> new.A%*%y_white<new.b
-  new.A <- linear.part %*% sqrt.cov
-  den <- sqrt(apply(new.A ^ 2, 1, sum))
-  new.b <- b - linear.part %*% mmean
-  new.A <- new.A / den
-  new.b <- new.b / den
-  mu <- mmean
-  # colour a "white" point
-  inverse.map <- function(Z) {
-    (sqrt.cov %*% Z) + as.vector(mu)
-  } 
-  # whiten a "coloured" point
-  forward.map <- function(W) sqrt.inv %*% (W - as.vector(mu))
-  return(list(inverse.map = inverse.map, forward.map = forward.map, new.A = new.A, new.b = new.b))
-}
-
-
-sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.interest,
-                            how.often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
-                            use.constraint.directions = TRUE, verbose = FALSE, time.constant = 1e-6) {
-  # routine to do whitening, activate the sampler, and recolour the samples
-  if (how.often < 0) {
-    how.often <- ndraw + burnin
-  }
-  
-  if (skip) {
-    # if Hamiltonian sampler got stuck before for same set-up do not try again
-    #  sample from whitened points with new constraints
-    Z <- sample.truncnorm.white(new.A, new.b, white.Y, white.direction.of.interest,
-                                           how.often = how.often, ndraw = ndraw, burnin = burnin,
-                                           sigma = 1, use.A = use.constraint.directions)
-  } else {
-    # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
-    # current wrap around is not windows supported
-    nw <- length(white.Y)
-    nconstraint <- dim(new.A)[1]
-    nsample <- ndraw / 2 + burnin
-    time.factor <- nw * nconstraint * nsample
-    time.limit <- time.factor * time.constant
-    tic()
-    trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white.Y,
-                                                     -new.A, as.vector(new.b), burn.in = burnin)},
-                                               timeout = time.limit, on_timeout = "error"), 0)
-    time <- toc(quiet = TRUE)
-    time.diff <- round(time$toc - time$tic, 4)
-    if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
-      skip <<- TRUE
-      if (ft){
-        first.text <- "this variable was tested for the first time;"
-      } else {
-        first.text <- "this variable was not tested for the first time;"
-      }
-      warning(paste("Hamiltonian not successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
-      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first.text, "using hit-and-run sampler"))
-      #  sample from whitened points with new constraints
-      Z <- sample.truncnorm.white(new.A, new.b, white.Y, white.direction.of.interest,
-                                              how.often = how.often, ndraw = ndraw, burnin = burnin,
-                                              sigma = 1, use.A = use.constraint.directions)
-    } else {
-      warning(paste("Hamiltonian successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
-      Z <- trywhite$value
-    }
-    
-  }
-  return(Z)
-}
-
-
-carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family = "gaussian", groups,
-                                   intercept = TRUE, ndraw = 8000, burnin = 2000,
-                                   sig.level = 0.05, aggregation = 0.05, FWER = TRUE, verbose = FALSE, which.check = NULL) {
+carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma = NULL, family = "gaussian",
+                              intercept = TRUE, which.check = NULL, ndraw = 8000, burnin = 2000,
+                              sig.level = 0.05, FWER = TRUE, aggregation = 0.05, time.constant = 1e-6, verbose = FALSE) {
   # to be applied after Lasso Selection
   # X: full X matrix
   # y: full y vector
   # ind: indices used for selection, i.e. Lasso was applied to X[ind,] and y[ind]
+  # groups: groups to be tested
   # beta: coefficients obtained from Lasso selection
-  # sigma: standard deviation, assumed to be known
   # tol.beta tolerance, to assume variable to be active
   # lambda: penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
+  # sigma: standard deviation, assumed to be known for Gaussian
   # family: gaussian or binomial
-  # groups: groups to be tested
+  # intercept: was the model fit using an intercept
+  # which.check: which groups shall be checked (might skip "unimportant" ones)
   # ndraw: number of points to draw
   # burnin: number of initial points to burn
-  # ndraw and burning might be increased for high the degrees of freedom or due to required significance
+  # ndraw and burning might be increased for high degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
   # sig.level: level for the hypothesis test
   # FWER: whether a FWER correction will be applied
   # aggregation: aggregation parameter \gamma.min
-  # selected: whether to use the selected viewpoint for aggregation
-  # verbose: print some key steps
+  # time.constant: the Hamiltonian sampler is assumed to be stuck, if it does not
+  # finish after (ndraw + burnin) * number of constraints * dimensionality * time.constant seconds
+  # verbose: whether to print key steps
+  
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
     stop(paste("Unknown family, family should be one of", paste(knownfamilies, collapse = ", ")))
@@ -544,7 +438,7 @@ carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, f
     X <- sqrt(W) %*% X
     sigma <- 1
   }
-
+  
   splitn <- length(ind)
   chosen <- which(abs(beta) > tol.beta) # selected variables
   s <- length(chosen)
@@ -666,7 +560,7 @@ carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, f
   }
   correction.factor <- (1 - log(aggregation)) / aggregation
   min.size <- ceiling(1/(sig.level/correction.factor))
-
+  
   nskipped <- 0
   for (group in groups) {
     j <- j + 1
@@ -680,7 +574,7 @@ carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, f
     } else {
       group.vars <- which(chosen %in% group)
     }
-
+    
     if (length(group.vars) > 0) {
       if (verbose) print(paste("Inference for group", j))
       eta <- matrix(t(OLS.func[group.vars, ]), ncol = length(group.vars))
@@ -727,7 +621,7 @@ carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, f
       
       etasign <- t(t(eta)*sign(beta[chosen[group.vars]]))
       continue <- FALSE
-
+      
       i <- 0
       while (!continue) {
         i <- i + 1
@@ -784,6 +678,119 @@ carve.lasso.group <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, f
   }
   warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngroup.tested, "groups"))
   return(list(pv = pvaluessum))
+}
+
+conditional<-function(S, mean, C, d) {
+  # Return an equivalent constraint 
+  # after having conditioned on a linear equality.
+  # Let the inequality constraints be specified by
+  # `(A,b)` and the equality constraints be specified
+  # by `(C,d)`. We form equivalent inequality constraints by 
+  # considering the residual
+  # AY - E(AY|CY=d)
+  # delta.cov and delta.mean are reduction in covariance and mean, due to equality constraint
+  # formula can be generally derived for any such equality constraint
+  C <- matrix(C, ncol = nrow(S))
+  M1 <- tcrossprod(S, C)
+  M2 <- C %*% M1
+  if (is.matrix(M2)) {
+    M2i <- ginv(M2)
+    delta.cov <- M1 %*% tcrossprod(M2i, M1)
+    delta.mean <- M1 %*% M2i %*% (C %*% mean - d)
+  } else {
+    M2i <- 1 / M2
+    delta.cov <- M1 %o% M1 / M2i
+    delta.mean <- M1 * d  / M2i 
+  }
+  return(list(delta.cov = delta.cov, delta.mean = delta.mean))
+}
+
+
+whiten <- function(cov, linear.part, b, mmean, rank = NULL) {
+  #   Return a whitened version of constraints in a different
+  #   basis, and a change of basis matrix.
+
+  # calculate a root of the covariance matrix using EVD
+  if (is.null(rank)) rank <- rankMatrix(cov)[1]
+  ev <- eigen(cov)
+  D1 <- ev$values
+  U <- ev$vectors
+  Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
+  while (!is.null(Dtry$warning)) {
+    warning("Reducing Rank")
+    rank <- rank - 1
+    Dtry <- tryCatch_W_E(sqrt(D1[rank:1]))
+  }
+  D <- Dtry$value
+  U <- U[, rank:1]
+  
+  sqrt.cov <- Re(t(t(U)*D))
+  sqrt.inv <- Re(t(U) / D)
+  # get equivalent constraint for whitened vector i.e linear.part%*%y<b <=> new.A%*%y_white<new.b
+  new.A <- linear.part %*% sqrt.cov
+  den <- sqrt(apply(new.A ^ 2, 1, sum))
+  new.b <- b - linear.part %*% mmean
+  new.A <- new.A / den
+  new.b <- new.b / den
+  mu <- mmean
+  # colour a "white" point
+  inverse.map <- function(Z) {
+    (sqrt.cov %*% Z) + as.vector(mu)
+  } 
+  # whiten a "coloured" point
+  forward.map <- function(W) sqrt.inv %*% (W - as.vector(mu))
+  return(list(inverse.map = inverse.map, forward.map = forward.map, new.A = new.A, new.b = new.b))
+}
+
+
+sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.interest,
+                            how.often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
+                            use.constraint.directions = TRUE, verbose = FALSE, time.constant = 1e-6) {
+  # routine to do whitening, activate the sampler, and recolour the samples
+  if (how.often < 0) {
+    how.often <- ndraw + burnin
+  }
+  
+  if (skip) {
+    # if Hamiltonian sampler got stuck before for same set-up do not try again
+    #  sample from whitened points with new constraints
+    Z <- sample.truncnorm.white(new.A, new.b, white.Y, white.direction.of.interest,
+                                           how.often = how.often, ndraw = ndraw, burnin = burnin,
+                                           sigma = 1, use.A = use.constraint.directions)
+  } else {
+    # this sampler seems to work better for most cases, though, it sometime takes "forever" => not usable
+    # current wrap around is not windows supported
+    nw <- length(white.Y)
+    nconstraint <- dim(new.A)[1]
+    nsample <- ndraw / 2 + burnin
+    time.factor <- nw * nconstraint * nsample
+    time.limit <- time.factor * time.constant
+    tic()
+    trywhite <- tryCatch_W_E(eval_with_timeout({rtmg(ndraw / 2, diag(nw), rep(0,nw), white.Y,
+                                                     -new.A, as.vector(new.b), burn.in = burnin)},
+                                               timeout = time.limit, on_timeout = "error"), 0)
+    time <- toc(quiet = TRUE)
+    time.diff <- round(time$toc - time$tic, 4)
+    if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
+      skip <<- TRUE
+      if (ft){
+        first.text <- "this variable was tested for the first time;"
+      } else {
+        first.text <- "this variable was not tested for the first time;"
+      }
+      warning(paste("Hamiltonian not successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
+      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first.text, "using hit-and-run sampler"))
+      #  sample from whitened points with new constraints
+      Z <- sample.truncnorm.white(new.A, new.b, white.Y, white.direction.of.interest,
+                                              how.often = how.often, ndraw = ndraw, burnin = burnin,
+                                              sigma = 1, use.A = use.constraint.directions)
+    } else {
+      warning(paste("Hamiltonian successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
+      Z <- trywhite$value
+    }
+    
+  }
+  return(Z)
 }
 
 
