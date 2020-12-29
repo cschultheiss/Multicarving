@@ -23,10 +23,11 @@ require(git2r)
 commit <- revparse_single(revision = "HEAD")
 print(paste("Run on commit", commit$sha, 'i.e.:', commit$summary))
 
-source("hdi_adjustments.R")
-source("optimal_inference.R")
-source("sample_from_truncated.R")
-source("tryCatch-W-E.R")
+# adjust depending on folder structure
+source("inference/hdi_adjustments.R")
+source("inference/optimal_inference.R")
+source("inference/sample_from_truncated.R")
+source("inference/tryCatch-W-E.R")
 
 p <- 500
 rho <- 0.6

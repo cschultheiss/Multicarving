@@ -22,12 +22,11 @@ commit <- revparse_single(revision = "HEAD")
 print(paste("Run on commit", commit$sha, 'i.e.:', commit$summary))
 
 
-
 # adjust depending on folder structure
-source("hdi_adjustments.R")
-source("optimal_inference.R")
-source("tryCatch-W-E.R")
-source("sample_from_truncated.R")
+source("inference/hdi_adjustments.R")
+source("inference/optimal_inference.R")
+source("inference/sample_from_truncated.R")
+source("inference/tryCatch-W-E.R")
 
 # toeplitz
 n <- 100
