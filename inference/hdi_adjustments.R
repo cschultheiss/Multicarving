@@ -1,37 +1,36 @@
 # this file contains functions adapted from the functions in hdi for multisplitting
 # making them applicable to multicarving
 
-multi.carve <- function (x, y, B = 50, fraction = 0.9,
-                            model.selector = lasso.cvcoef, classical.fit = lm.pval.flex,
-                            parallel = FALSE, ncores = getOption("mc.cores", 2L), 
-                            gamma = ((1:B)/B)[((1:B)/B) >= 0.05],
-                            family = "gaussian",
-                            args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                            se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
-                            args.classical.fit = list(t.test = FALSE), return.nonaggr = FALSE, return.selmodels = FALSE, skip.variables = TRUE,
-                            verbose = FALSE, FWER = TRUE, split.pval= TRUE,
-                            args.lasso.inference = list(sigma = NA, sig.level = 0.05, FWER = FWER, aggregation = min(gamma))) {
+multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B) >= 0.05], FWER = TRUE, family = "gaussian",
+                        model.selector = lasso.cvcoef, args.model.selector = list(intercept = TRUE, standardize = FALSE),
+                        se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
+                        args.lasso.inference = list(sigma = NA, sig.level = 0.05, FWER = FWER, aggregation = min(gamma)),
+                        split.pval= TRUE, classical.fit = lm.pval.flex, args.classical.fit = list(t.test = FALSE),
+                        parallel = FALSE, ncores = getOption("mc.cores", 2L), skip.variables = TRUE,
+                        return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model and calculate carving p-values B times
   # x: matrix of predictors
   # y: response vector
   # B: number of splits
   # fraction: fraction used for selection
-  # model.selector: how the model is chosen
+  # gamma: quantiles to consider, if several, additional penalty is applied
+  # FWER: shall a FWER correction be applied
+  # family: gaussian or binomial
+  # model.selector: how the model is chosen (must be some version of Lasso)
+  # args.model.selector: additional arguments for the selection process
+  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator: additional arguments to estimate sigma
+  # args.lasso.inference: additional arguments for inference after Lasso
+  # split.pval: shall p-values for splitting be determined as well
   # classical.fit: function to calculate splitting p-values
+  # args.classical.fit: additional arguments for calculating splitting p-values
   # parallel: whether to parallelize the splits
   # ncores: number of cores for parallelization
-  # gamma: quantiles to consider, if several, additional penalty is applied
-  # family: gaussian or binomial
-  # args.model.selector: additional arguments for selection process
-  # args.classical.fit: additional arguments for calculating splitting p-values
+  # skip.variables: shall carving p-values for variables selected less than min(gamma) * B times be omitted
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
-  # skip.variables: shall carving p-values for variables selected less than min(gamma)*B times be omitted
   # verbose: whether to print key steps
-  # FWER: shall a FWER correction be applied
-  # split.pval: shall p-values for splitting be determined as well
-  # args.lasso.inference: additional arguments for inference after Lasso
-  
+
   
   args.model.selector$family <- family
   args.lasso.inference$family <- family
@@ -397,9 +396,22 @@ multi.carve <- function (x, y, B = 50, fraction = 0.9,
   }
 }
 
-carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", args.model.selector = list(intercept = TRUE, standardize = FALSE, tol.beta = 1e-5),
-                      return.selmodels = FALSE, verbose = FALSE, FWER = TRUE, estimate.sigma = TRUE, df.corr = FALSE,
-                      args.lasso.inference = list(sigma = NA)) {
+carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = lasso.cvcoef,
+                      args.model.selector = list(intercept = TRUE, standardize = FALSE, tol.beta = 1e-5),
+                      estimate.sigma = TRUE, df.corr = FALSE, args.lasso.inference = list(sigma = NA),
+                      return.selmodels = FALSE, verbose = FALSE) {
+  # routine to select a model and perform pure post-selection inference
+  # x: matrix of predictors
+  # y: response vector
+  # FWER: shall a FWER correction be applied
+  # family: gaussian or binomial
+  # model.selector: how the model is chosen (must be some version of Lasso)
+  # args.model.selector: additional arguments for the selection process
+  # estimate.sigma: is sigma estimated on the provided submodel
+  # df.corr: is the number of selected variables taken into account to estimate sigma
+  # args.lasso.inference: additional arguments for inference after Lasso
+  # return sel.models: shall the information, which model was selected be returned
+  # verbose: whether to print key steps
 
   args.model.selector$family <- family
   args.lasso.inference$family <- family
@@ -562,13 +574,34 @@ carve100 <- function (x, y, model.selector = lasso.cvcoef, family = "gaussian", 
                  sel.models = sel.models, method = "carve100", call = match.call()), class = "carve")
 }
 
-multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, family = "gaussian",
-                               model.selector = lasso.cvcoef, parallel = FALSE, ncores = getOption("mc.cores", 2L),
-                               gamma = ((1:B)/B)[((1:B)/B) >= 0.05], args.model.selector = list(intercept = TRUE, standardize = FALSE),
-                               return.nonaggr = FALSE, return.selmodels = FALSE, skip.groups = TRUE,
+multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B) >= 0.05], FWER = FALSE, family = "gaussian", 
+                               model.selector = lasso.cvcoef, args.model.selector = list(intercept = TRUE, standardize = FALSE),
                                se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
-                               verbose = FALSE, FWER = FALSE,
-                               args.lasso.inference = list(sigma = NA, sig.level = 0.05, FWER = FWER, aggregation = min(gamma))) {
+                               args.lasso.inference = list(sigma = NA, sig.level = 0.05, FWER = FWER, aggregation = min(gamma)),
+                               parallel = FALSE, ncores = getOption("mc.cores", 2L), skip.groups = TRUE,
+                               return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
+  
+  # routine to split the data, select a model and calculate carving p-values for groups B times
+  # x: matrix of predictors
+  # y: response vector
+  # groups: groups for which a p-value shall be determined
+  # B: number of splits
+  # fraction: fraction used for selection
+  # gamma: quantiles to consider, if several, additional penalty is applied
+  # FWER: shall a FWER correction be applied
+  # family: gaussian or binomial
+  # model.selector: how the model is chosen (must be some version of Lasso)
+  # args.model.selector: additional arguments for the selection process
+  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator: additional arguments to estimate sigma
+  # args.lasso.inference: additional arguments for inference after Lasso
+  # parallel: whether to parallelize the splits
+  # ncores: number of cores for parallelization
+  # skip.groups: shall carving p-values for groups selected less than min(gamma) * B times be omitted
+  # return.nonaggr: shall raw p-values be returned
+  # return sel.models: shall the information, which model was selected be returned
+  # verbose: whether to print key steps
+  
   args.lasso.inference$family <- family
   args.model.selector$family <- family
   if (family == "gaussian"){
@@ -847,15 +880,39 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, family = "g
                  sel.models = sel.models, method = "multi.carve.group", call = match.call()), class = "carve")
 }
 
-multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, ci.level = 0.95, model.selector = lasso.cvcoef,
-                                     classical.fit = lm.pval, parallel = FALSE, ncores = getOption("mc.cores", 2L),
-                                     gamma = ((1:B)/B)[((1:B)/B) >= 0.05], family = "gaussian",
+multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B) >= 0.05], FWER = FALSE, ci.level = 0.95,
+                                     family = "gaussian", model.selector = lasso.cvcoef,
                                      args.model.selector = list(intercept = TRUE, standardize = FALSE),
                                      se.estimator = "modwise", args.se.estimator = list(df.corr = TRUE, intercept = TRUE, standardize = FALSE),
-                                     args.classical.fit = NULL, args.classical.ci = NULL, return.nonaggr = FALSE, 
-                                     return.selmodels = FALSE, verbose = FALSE, ci.timeout = 10,
-                                     FWER = FALSE, split.pval = TRUE, t.test = TRUE,
-                                     args.lasso.inference = list(sigma = NA)) {
+                                     args.lasso.inference = list(sigma = NA), ci.timeout = 10, split.pval = TRUE,
+                                     classical.fit = lm.pval, args.classical.fit = NULL, args.classical.ci = NULL,
+                                     parallel = FALSE, ncores = getOption("mc.cores", 2L),
+                                     return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
+  # routine to split the data, select a model, calculate carving p-values B times and determine the corresponding CI
+  # x: matrix of predictors
+  # y: response vector
+  # B: number of splits
+  # fraction: fraction used for selection
+  # gamma: quantiles to consider, if several, additional penalty is applied
+  # FWER: shall a FWER correction be applied
+  # ci.level: level of the confindence interval
+  # family: gaussian or binomial
+  # model.selector: how the model is chosen (must be some version of Lasso)
+  # args.model.selector: additional arguments for the selection process
+  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator: additional arguments to estimate sigma
+  # args.lasso.inference: additional arguments for inference after Lasso
+  # ci.timeout: maximum time to search for an uncovered point before setting the bound to Inf/ -Inf
+  # split.pval: shall p-values and confidence intervals for splitting be determined as well
+  # classical.fit: function to calculate splitting p-values
+  # args.classical.fit: additional arguments for calculating splitting p-values
+  # args.classical.fit: additional arguments for calculating splitting CI
+  # parallel: whether to parallelize the splits (CI calculation is never parallelized)
+  # ncores: number of cores for parallelization
+  # skip.variables: shall carving p-values for variables selected less than min(gamma) * B times be omitted
+  # return.nonaggr: shall raw p-values be returned
+  # return sel.models: shall the information, which model was selected be returned
+  # verbose: whether to print key steps
 
   args.model.selector$family <- family
   args.lasso.inference$family <- family
