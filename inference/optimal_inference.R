@@ -616,7 +616,7 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
       
       # get a sample of points fulfilling all constraints
       Z <- sample.from.constraints(new.A, new.b, white.Y, white.eta, ndraw = ndraw,
-                                   burnin = burnin, how.often = 10, verbose = verbose)
+                                   burnin = burnin, how.often = 10, verbose = verbose, time.constant = time.constant)
       Z <- t(inverse.map(t(Z)))
       
       etasign <- t(t(eta)*sign(beta[chosen[group.vars]]))
@@ -642,7 +642,7 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
           ft <<- FALSE
           Z <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                        ndraw = 2 * max(min.size, ndraw), burnin=0,
-                                       how.often = 10, verbose = verbose)
+                                       how.often = 10, verbose = verbose, time.constant = time.constant)
           Z <- t(inverse.map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig.level && max(pval1, pval2) > 1.5 * sig.level) {
@@ -654,7 +654,7 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
           ft <<- FALSE
           Zn <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                         ndraw = 2 * max(min.size, ndraw), burnin = 0,
-                                        how.often = 10, verbose = verbose)
+                                        how.often = 10, verbose = verbose, time.constant = time.constant)
           Zn <- t(inverse.map(t(Zn)))
           Z <- rbind(Z, Zn)
           continue <- FALSE
