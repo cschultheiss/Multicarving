@@ -329,10 +329,16 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
       vup[j] <- Vplus
       estimates[j] <- etay
       ses[j] <- sigeta
+      
+      pv <- selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus)
+      if (pv == 0 || pv == 1 || is.na(pv)) {
+        pv <- selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus, bits = 2)
+        if (is.na(pv)) pv <- selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus, bits = 100)
+      }
       if (beta[chosen[j]] > 0) {
-        pvalues[j] <- selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus)
+        pvalues[j] <- pv
       } else {
-        pvalues[j] <- 1-selectiveInference:::tnorm.surv(etay, 0, sigeta, Vmin, Vplus)
+        pvalues[j] <- 1 - pv
       }
       if (is.na(pvalues[j])){
         if (intercept){

@@ -1581,7 +1581,7 @@ does.it.cover.gammamin.saturated <- function (beta.j, ci.info) {
     } 
   }
   if (any(is.na(pvals))) stop("At least one p-value is NA")
-  pvals <- pmin(pvals, 1-pvals)
+  pvals <- pmin(pvals, 1 - pvals)
   if (multi.corr) pvals <- pvals * s0
   pval.rank <- rank(pvals, ties.method = "first")
   nsplit <- length(pval.rank) + no.inf.ci
