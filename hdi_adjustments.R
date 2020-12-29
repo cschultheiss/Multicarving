@@ -1692,6 +1692,10 @@ pval.creator <- function(beta, gamma, vlo, vup, centers, ses, s0 = NA, multi.cor
   pvals <- numeric(npv)
   for (i in 1:npv) {
     pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta, ses[i], vlo[i], vup[i])
+    if (pvals[i] == 0 || pvals[i] == 1 || is.na(pvals[i])) {
+      pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta, ses[i], vlo[i], vup[i], bits = 2)
+      if (is.na(pvals[i])) pvals[i] <- selectiveInference:::tnorm.surv(centers[i], beta, ses[i], vlo[i], vup[i], bits = 100)
+    } 
   }
   pvals <- 2 * pmin(pvals, 1 - pvals)
   pvals <- c(pvals, rep(1, no.inf.ci))
