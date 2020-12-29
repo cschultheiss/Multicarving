@@ -4,7 +4,7 @@ save <- TRUE
 # create save location, adjust depending on folder structure
 if (save) {
   newdir <- format(Sys.time(), "%d-%b-%Y %H.%M")
-  dir.create(paste("multi_carve/",newdir,sep="")) 
+  dir.create(paste("simulation_setups/multi_carve/", newdir, sep="")) 
 }
 
 require(MASS)
@@ -334,7 +334,7 @@ for (frac in frac.vec) {
     resname <- paste0("results ", format(Sys.time(), "%d-%b-%Y %H.%M"),
                       " split=", frac, " B=", B, " seed=", rseed)
     # adjust depending on folder structure
-    if (save) save(simulation, file = paste("multi_carve/", newdir, "/", resname, ".RData", sep = ""))
+    if (save) save(simulation, file = paste("simulation_setups/multi_carve/", newdir, "/", resname, ".RData", sep = ""))
     # end of analysis for given B
   }
   # end of analysis for given fraction

@@ -4,7 +4,7 @@ save <- TRUE
 # create save location, adjust depending on folder structure
 if (save) {
   newdir <- format(Sys.time(), "%d-%b-%Y %H.%M")
-  dir.create(paste("group_example/",newdir,sep="")) 
+  dir.create(paste("simulation_setups/group_example/", newdir, sep="")) 
   
 }
 
@@ -236,7 +236,7 @@ for (n in n.vec) {
         resname <- paste0("results ", format(Sys.time(), "%d-%b-%Y %H.%M")," n=",n,
                           " split=", frac, " B=", B, " delta=", delta, " seed=", rseed)
         # adjust depending on folder structure
-        if (save) save(simulation, file = paste("group_example/", newdir, "/", resname, ".RData", sep = ""))
+        if (save) save(simulation, file = paste("simulation_setups/group_example/", newdir, "/", resname, ".RData", sep = ""))
 
       }
       # end of simulation for given fraction

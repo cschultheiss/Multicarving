@@ -5,7 +5,7 @@ save <- TRUE
 
 if (save) {
   newdir <- format(Sys.time(), "%d-%b-%Y %H.%M")
-  dir.create(paste("multi_carve/",newdir,sep="")) 
+  dir.create(paste("simulation_setups/multi_carve/CI_", newdir, sep="")) 
 
 }
 
@@ -205,7 +205,7 @@ for (frac in frac.vec) {
                      "sd" = sd, "commit" = commit)
   resname <- paste0("results ", format(Sys.time(), "%d-%b-%Y %H.%M"), " split=", frac, " B=", B, " seed=", rseed)
   # adjust depending on folder structure
-  if (save) save(simulation, file = paste("multi_carve/", newdir, "/", resname, ".RData", sep = ""))
+  if (save) save(simulation, file = paste("simulation_setups/multi_carve/CI_", newdir, "/", resname, ".RData", sep = ""))
 }
 
       
