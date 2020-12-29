@@ -16,7 +16,7 @@ The user will mainly interact with the following four functions:
    - multi.carve.group: Function to execute the whole multicarving process for groups, i.e. selecting a model and performing groupwise inference on each split as well as           calculate multicarving p-values. Must at least provide predictor matrix (x) and response vector (y) and a list of vectors for the groups that shall be tested.
    - multi.carve.ci.saturated: Function to determine multicarving confidence intervals using the saturated viewpoint, i.e. selecting a model and infering on each split as         well as calculate multicarving p-values and confindence intervals afterwards. Must at least provide predictor matrix (x) and response vector (y).
 
-optimal_inference.R: Routines to calculate carving p-values. Does the necessary preprocessing as well as the evaluation of \n the MCMC samples. 
+optimal_inference.R: Routines to calculate carving p-values. Does the necessary preprocessing as well as the evaluation of the MCMC samples. 
 
 sample_from_truncated.R: Hit-and-run MCMC sampler for truncated, multivariate, white Gaussian.
 
