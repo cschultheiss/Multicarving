@@ -62,6 +62,8 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   n.right <- n - n.left
   stopifnot(n.left >= 1, n.right >= 0)
   oneSplit.select <- function(b) {
+    if (verbose) 
+      cat("...split", b, "\n")
     sel.models <- logical(p)
     try.again <- TRUE
     split.count <- 0
@@ -160,14 +162,16 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
       }
     }
     sel.models[sel.model] <- TRUE
-    return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda))
+    return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda, B = b))
   }
   sel.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
-      cat("...starting parallelization of sample-splits\n")
+      cat("...starting parallelization of sample-splits for selection\n")
     mclapply(1:B, oneSplit.select, mc.cores = ncores)
   } else {
+    if (verbose) 
+      cat("...selecting models\n")
     lapply(1:B, oneSplit.select)
   }
   if (skip.variables){
@@ -184,6 +188,8 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   }
   
   oneSplit.infer <- function(sel) {
+    if (verbose) 
+      cat("...split", sel$B, "\n")
     if (split.pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
     } else {
@@ -308,9 +314,11 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   inf.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
-      cat("...starting parallelization of sample-splits\n")
+      cat("...starting parallelization of sample-splits for inference\n")
     mclapply(sel.out, oneSplit.infer, mc.cores = ncores)
   } else {
+    if (verbose) 
+      cat("...calculating p-values\n")
     lapply(sel.out, oneSplit.infer)
   }
   myExtract <- function(name) {
@@ -427,7 +435,8 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
   thresh.count <- 0L
   threshn <- 1e-7
   split.again <- FALSE
-
+  if (verbose) 
+    cat("...selecting model\n")
   output <- do.call(model.selector, 
                     args = c(list(x = x, y = y), args.model.selector))
   sel.model <- output$sel.model
@@ -497,6 +506,8 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
     stop("Can not fit that data")
   }
   
+  if (verbose) 
+    cat("...calculating p-values\n")
   if (estimate.sigma && family == "gaussian") {
     if (length(beta) == p + 1) beta <- beta[-1]
     if (args.model.selector$intercept){
@@ -630,6 +641,8 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   n.right <- n - n.left
   stopifnot(n.left >= 1, n.right >= 0)
   oneSplit.select <- function(b) {
+    if (verbose) 
+      cat("...split", b, "\n")
     sel.models <- logical(p)
     try.again <- TRUE
     split.count <- 0
@@ -728,14 +741,16 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
       }
     }
     sel.models[sel.model] <- TRUE
-    return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda))
+    return (list(sel.models = sel.models, split = split, beta = beta, lambda = lambda, B = b))
   }
   sel.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
-      cat("...starting parallelization of sample-splits\n")
+      cat("...starting parallelization of sample-splits for selection\n")
     mclapply(1:B, oneSplit.select, mc.cores = ncores)
   } else {
+    if (verbose) 
+      cat("...selecting models\n")
     lapply(1:B, oneSplit.select)
   }
   if (skip.groups){
@@ -760,6 +775,8 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   }
   
   oneSplit.infer <- function(sel) {
+    if (verbose) 
+      cat("...split", sel$B, "\n")
     pvals.v <- rep(1, ngroup)
     sel.models <- sel$sel.models
     sel.model <- which(sel.models)
@@ -839,9 +856,11 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   inf.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
-      cat("...starting parallelization of sample-splits\n")
+      cat("...starting parallelization of sample-splits for inference\n")
     mclapply(sel.out, oneSplit.infer, mc.cores = ncores)
   } else {
+    if (verbose) 
+      cat("...calculating p-values\n")
     lapply(sel.out, oneSplit.infer)
   }
   myExtract <- function(name) {
@@ -941,6 +960,8 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
   n.right <- n - n.left
   stopifnot(n.left >= 1, n.right >= 0)
   oneSplit <- function(b) {
+    if (verbose) 
+      cat("...split", b, "\n")
     if (split.pval) {
       pvals.v <- matrix(1, nrow = 2, ncol = p)
     } else {
@@ -1191,21 +1212,19 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
   split.out <- if (parallel) {
     stopifnot(isTRUE(is.finite(ncores)), ncores >= 1L)
     if (verbose) 
-      cat("...starting parallelization of sample-splits\n")
+      cat("...starting parallelization of sample-splits for selection and constraints\n")
     mclapply(1:B, oneSplit, mc.cores = ncores)
   } else {
-    if (verbose) 
-      lapply(1:B, function(b) {
-        cat("...Split", b, "\n")
-        oneSplit()
-      })
-    else replicate(B, oneSplit(), simplify = FALSE)
-    
+    if (verbose)
+      cat("...selecting models and determing constraints\n")
+    lapply(1:B, oneSplit)
   }
   myExtract <- function(name) {
     matrix(unlist(lapply(split.out, "[[", name)), nrow = B, 
            byrow = TRUE)
   }
+  if (verbose) 
+    cat("...determing confidence intervals\n")
   if (split.pval) { 
     ls <- list()
     pvalsall <- array(unlist(lapply(split.out, "[[", "pvals")), dim = c(2, p, B))
