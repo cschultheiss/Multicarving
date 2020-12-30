@@ -5,7 +5,7 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
                         model.selector = lasso.cvcoef, args.model.selector = list(intercept = TRUE, standardize = FALSE),
                         se.estimator = "1se", args.se.estimator = list(df.corr = FALSE, intercept = TRUE, standardize = FALSE),
                         args.lasso.inference = list(sigma = NA, sig.level = 0.05, FWER = FWER, aggregation = min(gamma)),
-                        split.pval= TRUE, classical.fit = lm.pval.flex, args.classical.fit = list(t.test = FALSE),
+                        split.pval= TRUE, classical.fit = lm.pval.flex, args.classical.fit = NULL,
                         parallel = FALSE, ncores = getOption("mc.cores", 2L), skip.variables = TRUE,
                         return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model and calculate carving p-values B times
@@ -35,6 +35,7 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   args.model.selector$family <- family
   args.lasso.inference$family <- family
   
+  if (is.null(args.lasso.inference$sigma)) args.lasso.inference$sigma <- NA
   if (family == "gaussian"){
     if (se.estimator == "None" && is.na(args.lasso.inference$sigma)) stop("Neither SE estimator type nor sigma provided for Gaussian family. This is not ok")
     if (is.na(args.lasso.inference$sigma)) {
@@ -424,6 +425,7 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
   args.model.selector$family <- family
   args.lasso.inference$family <- family
   
+  if (is.null(args.lasso.inference$sigma)) args.lasso.inference$sigma <- NA
   if (family == "gaussian" && !estimate.sigma && is.na(args.lasso.inference$sigma)) stop("Sigma not provided and estimation not enabled for Gaussian family. This is not ok")
   if (!is.na(args.lasso.inference$sigma)) estimate.sigma <- FALSE
 
@@ -615,6 +617,8 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   
   args.lasso.inference$family <- family
   args.model.selector$family <- family
+  
+  if (is.null(args.lasso.inference$sigma)) args.lasso.inference$sigma <- NA
   if (family == "gaussian"){
     if (se.estimator == "None" && is.na(args.lasso.inference$sigma)) stop("Neither SE estimator type nor sigma provided for Gaussian family. This is not ok")
     if (is.na(args.lasso.inference$sigma)) {
@@ -935,6 +939,8 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
 
   args.model.selector$family <- family
   args.lasso.inference$family <- family
+  
+  if (is.null(args.lasso.inference$sigma)) args.lasso.inference$sigma <- NA
   if (family == "gaussian"){
     if (se.estimator == "None" && is.na(args.lasso.inference$sigma)) stop("Neither SE estimator type nor sigma provided for Gaussian family. This is not ok")
     if (is.na(args.lasso.inference$sigma)) {
