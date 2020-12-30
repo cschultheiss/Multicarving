@@ -42,6 +42,6 @@ mc.ci <- multi.carve.ci.saturated(x, y)
 mc.ci
 
 set.seed(12)
-groups = list(c(1:5), c(21:30), c(50:200))
+groups <- list(c(1:5), c(21:30), c(50:200))
 mc.g <- multi.carve.group(x, y, groups)
 mc.g
