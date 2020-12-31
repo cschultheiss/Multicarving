@@ -7,29 +7,29 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
                         intercept = TRUE, which.check = NULL, selected = TRUE, ndraw = 8000, burnin = 2000,
                         sig.level = 0.05, FWER = TRUE, aggregation = 0.05,  time.constant = 1e-6, verbose = FALSE) {
   # to be applied after Lasso Selection
-  # X: full X matrix
-  # y: full y vector
-  # ind: indices used for selection, i.e. Lasso was applied to X[ind, ] and y[ind]
-  # beta: coefficients obtained from Lasso selection
-  # tol.beta tolerance, to assume variable to be active
-  # lambda: penalty parameter used for Lasso 
+  # X (matrix): full X matrix
+  # y (vector): full y vector
+  # ind (vector of indices): indices used for selection, i.e. Lasso was applied to X[ind, ] and y[ind]
+  # beta (vector of numeric): coefficients obtained from Lasso selection
+  # tol.beta (numeric >= 0): tolerance, to assume variable to be active
+  # lambda (numeric): penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
-  # sigma: standard deviation, assumed to be known for Gaussian
-  # family: Gaussian or binomial
-  # intercept: was the model fit using an intercept
-  # which.check: which variables shall be checked (might skip "unimportant" ones)
-  # selected: whether to use the selected viewpoint for aggregation
+  # sigma (numeric >= 0): standard deviation, assumed to be known for Gaussian
+  # family (string): "gaussian" or "binomial"
+  # intercept (boolean): was the model fit using an intercept
+  # which.check (boolean): which variables shall be checked (might skip "unimportant" ones)
+  # selected (boolean): whether to use the selected viewpoint for aggregation
   # otherwise no sampling is of need
-  # ndraw: number of points to draw, when using hit-and-run sampler
-  # burnin: number of initial points to burn
+  # ndraw (integer > 0): number of points to draw, when using hit-and-run sampler
+  # burnin (integer >= 0): number of initial points to burn
   # ndraw and burning might be increased for high degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
-  # sig.level: level for the hypothesis test
-  # FWER: whether a FWER correction will be applied
-  # aggregation: aggregation parameter \gamma.min
-  # time.constant: the Hamiltonian sampler is assumed to be stuck, if it does not
+  # sig.level (numeric in (0,1)): level for the hypothesis test
+  # FWER (boolean): whether a FWER correction will be applied
+  # aggregation (numeric in (0,1)): aggregation parameter \gamma.min
+  # time.constant (numeric > 0): the Hamiltonian sampler is assumed to be stuck, if it does not
   # finish after (ndraw + burnin) * number of constraints * dimensionality * time.constant seconds
-  # verbose: whether to print key steps
+  # verbose (boolean): whether to print key steps
   
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
@@ -369,28 +369,28 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
                               intercept = TRUE, which.check = NULL, ndraw = 8000, burnin = 2000,
                               sig.level = 0.05, FWER = TRUE, aggregation = 0.05, time.constant = 1e-6, verbose = FALSE) {
   # to be applied after Lasso Selection
-  # X: full X matrix
-  # y: full y vector
-  # ind: indices used for selection, i.e. Lasso was applied to X[ind,] and y[ind]
-  # groups: groups to be tested
-  # beta: coefficients obtained from Lasso selection
-  # tol.beta tolerance, to assume variable to be active
-  # lambda: penalty parameter used for Lasso 
+  # X (matrix): full X matrix
+  # y (vector): full y vector
+  # ind (vector of indices): indices used for selection, i.e. Lasso was applied to X[ind,] and y[ind]
+  # groups (list of vectors of indices): groups to be tested
+  # beta (vector of numeric): coefficients obtained from Lasso selection
+  # tol.beta (numeric >= 0): tolerance, to assume variable to be active
+  # lambda (numeric): penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
-  # sigma: standard deviation, assumed to be known for Gaussian
-  # family: gaussian or binomial
-  # intercept: was the model fit using an intercept
-  # which.check: which groups shall be checked (might skip "unimportant" ones)
-  # ndraw: number of points to draw
-  # burnin: number of initial points to burn
+  # sigma (numeric >= 0): standard deviation, assumed to be known for Gaussian
+  # family (string): "gaussian" or "binomial"
+  # intercept (boolean): was the model fit using an intercept
+  # which.check (boolean): which groups shall be checked (might skip "unimportant" ones)
+  # ndraw (integer > 0): number of points to draw
+  # burnin (integer >= 0): number of initial points to burn
   # ndraw and burning might be increased for high degrees of freedom or due to required significance
   # the following three values are used to defined the minimally required sample size
-  # sig.level: level for the hypothesis test
-  # FWER: whether a FWER correction will be applied
-  # aggregation: aggregation parameter \gamma.min
-  # time.constant: the Hamiltonian sampler is assumed to be stuck, if it does not
+  # sig.level (numeric in (0,1)): level for the hypothesis test
+  # FWER (boolean): whether a FWER correction will be applied
+  # aggregation (numeric in (0,1)): aggregation parameter \gamma.min
+  # time.constant (numeric > 0): the Hamiltonian sampler is assumed to be stuck, if it does not
   # finish after (ndraw + burnin) * number of constraints * dimensionality * time.constant seconds
-  # verbose: whether to print key steps
+  # verbose (boolean): whether to print key steps
   
   knownfamilies <- c("gaussian", "binomial")
   if (!(family %in% knownfamilies)) {
@@ -797,14 +797,15 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
 constraint.checker<-function(X1, y1, beta, tol.beta, lambda,
                             family = "gaussian", intercept = TRUE, verbose = FALSE) {
   # to be applied after Lasso Selection, checks if Lasso convergence is sufficient to run the carving routine
-  # X1: selection part of X
-  # y1: selection part of y
-  # beta: coefficients obtained from Lasso selection
-  # sigma: standard deviation, assumed to be known for Gaussian
-  # tol.beta tolerance, to assume variable to be active
-  # lambda: penalty parameter used for Lasso 
+  # X1 (matrix): selection part of X
+  # y1 (vector): selection part of y
+  # beta (vector of numeric): coefficients obtained from Lasso selection
+  # tol.beta (numeric >= 0): tolerance, to assume variable to be active
+  # lambda (numeric): penalty parameter used for Lasso 
   # (with objective 1/2||X*\beta-y||^2+\lambda*||\beta||_1, i.e different normalization than in glmnet)
-  # family: Gaussian or binomial
+  # family (string): "gaussian" or "binomial"
+  # intercept (boolean): was the model fit using an intercept
+  # verbose (boolean): whether to print key steps
   knownfamilies <- c("gaussian", "binomial")
   if (!family %in% knownfamilies) {
     stop(paste("Unknown family, family should be one of", paste(knownfamilies, collapse = ", ")))
