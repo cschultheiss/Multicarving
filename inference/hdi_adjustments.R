@@ -32,6 +32,12 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   # verbose: whether to print key steps
 
   
+  if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
+    stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
+  
+  if (!(family %in% c("gaussian", "binomial")))
+    stop ("Invalid family provided, can only deal with gaussian and binomial")
+  
   args.model.selector$family <- family
   args.lasso.inference$family <- family
   
@@ -422,6 +428,9 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
   # return sel.models: shall the information, which model was selected be returned
   # verbose: whether to print key steps
 
+  if (!(family %in% c("gaussian", "binomial")))
+    stop ("Invalid family provided, can only deal with gaussian and binomial")
+  
   args.model.selector$family <- family
   args.lasso.inference$family <- family
   
@@ -614,6 +623,12 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
   # verbose: whether to print key steps
+  
+  if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
+    stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
+  
+  if (!(family %in% c("gaussian", "binomial")))
+    stop ("Invalid family provided, can only deal with gaussian and binomial")
   
   args.lasso.inference$family <- family
   args.model.selector$family <- family
@@ -936,6 +951,12 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
   # return.nonaggr: shall raw p-values be returned
   # return sel.models: shall the information, which model was selected be returned
   # verbose: whether to print key steps
+  
+  if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
+    stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
+  
+  if (!(family %in% c("gaussian", "binomial")))
+    stop ("Invalid family provided, can only deal with gaussian and binomial")
 
   args.model.selector$family <- family
   args.lasso.inference$family <- family
