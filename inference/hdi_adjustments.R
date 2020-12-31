@@ -9,27 +9,27 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
                         parallel = FALSE, ncores = getOption("mc.cores", 2L), skip.variables = TRUE,
                         return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model and calculate carving p-values B times
-  # x: matrix of predictors
-  # y: response vector
-  # B: number of splits
-  # fraction: fraction used for selection
-  # gamma: quantiles to consider, if several, additional penalty is applied
-  # FWER: shall a FWER correction be applied
-  # family: gaussian or binomial
-  # model.selector: how the model is chosen (must be some version of Lasso)
-  # args.model.selector: additional arguments for the selection process
-  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
-  # args.se.estimator: additional arguments to estimate sigma
-  # args.lasso.inference: additional arguments for inference after Lasso
-  # split.pval: shall p-values for splitting be determined as well
-  # classical.fit: function to calculate splitting p-values
-  # args.classical.fit: additional arguments for calculating splitting p-values
-  # parallel: whether to parallelize the splits
-  # ncores: number of cores for parallelization
-  # skip.variables: shall carving p-values for variables selected less than min(gamma) * B times be omitted
-  # return.nonaggr: shall raw p-values be returned
-  # return sel.models: shall the information, which model was selected be returned
-  # verbose: whether to print key steps
+  # x (matrix): matrix of predictors
+  # y (vector): response vector
+  # B (integer): number of splits
+  # fraction (numeric in (0,1)): fraction used for selection
+  # gamma (numeric or vector of numeric in (0,1]): quantiles to consider, if several, additional penalty is applied
+  # FWER (boolean): shall a FWER correction be applied
+  # family (string): "gaussian" or "binomial"
+  # model.selector (function): how the model is chosen (must be some version of Lasso)
+  # args.model.selector (list): additional arguments for the selection process
+  # se.estimator (string): how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator (list): additional arguments to estimate sigma
+  # args.lasso.inference (list): additional arguments for inference after Lasso
+  # split.pval (boolean): shall p-values for splitting be determined as well
+  # classical.fit (function): function to calculate splitting p-values
+  # args.classical.fit (list): additional arguments for calculating splitting p-values
+  # parallel (boolean): whether to parallelize the splits
+  # ncores (integer): number of cores for parallelization
+  # skip.variables (boolean): shall carving p-values for variables selected less than min(gamma) * B times be omitted
+  # return.nonaggr (boolean): shall raw p-values be returned
+  # return.sel.models (boolean): shall the information, which model was selected be returned
+  # verbose (boolean): whether to print key steps
 
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
@@ -416,17 +416,17 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
                       estimate.sigma = TRUE, df.corr = FALSE, args.lasso.inference = list(sigma = NA),
                       return.selmodels = FALSE, verbose = FALSE) {
   # routine to select a model and perform pure post-selection inference
-  # x: matrix of predictors
-  # y: response vector
-  # FWER: shall a FWER correction be applied
-  # family: gaussian or binomial
-  # model.selector: how the model is chosen (must be some version of Lasso)
-  # args.model.selector: additional arguments for the selection process
-  # estimate.sigma: is sigma estimated on the provided submodel
-  # df.corr: is the number of selected variables taken into account to estimate sigma
-  # args.lasso.inference: additional arguments for inference after Lasso
-  # return sel.models: shall the information, which model was selected be returned
-  # verbose: whether to print key steps
+  # x (matrix): matrix of predictors
+  # y (vector): response vector
+  # FWER (boolean): shall a FWER correction be applied
+  # family (string): "gaussian" or "binomial"
+  # model.selector (function): how the model is chosen (must be some version of Lasso)
+  # args.model.selector (list): additional arguments for the selection process
+  # estimate.sigma (boolean): is sigma estimated on the provided submodel
+  # df.corr (boolean): is the number of selected variables taken into account to estimate sigma
+  # args.lasso.inference (list): additional arguments for inference after Lasso
+  # return.sel.models (boolean): shall the information, which model was selected be returned
+  # verbose (boolean): whether to print key steps
 
   if (!(family %in% c("gaussian", "binomial")))
     stop ("Invalid family provided, can only deal with gaussian and binomial")
@@ -604,25 +604,25 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
                                return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   
   # routine to split the data, select a model and calculate carving p-values for groups B times
-  # x: matrix of predictors
-  # y: response vector
-  # groups: groups for which a p-value shall be determined
-  # B: number of splits
-  # fraction: fraction used for selection
-  # gamma: quantiles to consider, if several, additional penalty is applied
-  # FWER: shall a FWER correction be applied
-  # family: gaussian or binomial
-  # model.selector: how the model is chosen (must be some version of Lasso)
-  # args.model.selector: additional arguments for the selection process
-  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
-  # args.se.estimator: additional arguments to estimate sigma
-  # args.lasso.inference: additional arguments for inference after Lasso
-  # parallel: whether to parallelize the splits
-  # ncores: number of cores for parallelization
-  # skip.groups: shall carving p-values for groups selected less than min(gamma) * B times be omitted
-  # return.nonaggr: shall raw p-values be returned
-  # return sel.models: shall the information, which model was selected be returned
-  # verbose: whether to print key steps
+  # x (matrix): matrix of predictors
+  # y (vector): response vector
+  # groups (list of vectors of indices): groups for which a p-value shall be determined
+  # B (integer): number of splits
+  # fraction (numeric in (0,1]): fraction used for selection
+  # gamma (numeric or vector of numeric in (0,1]): quantiles to consider, if several, additional penalty is applied
+  # FWER (boolean): shall a FWER correction be applied
+  # family (string): "gaussian" or "binomial"
+  # model.selector (function): how the model is chosen (must be some version of Lasso)
+  # args.model.selector (list): additional arguments for the selection process
+  # se.estimator (string): how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator (list): additional arguments to estimate sigma
+  # args.lasso.inference (list): additional arguments for inference after Lasso
+  # parallel (boolean): whether to parallelize the splits
+  # ncores (integer): number of cores for parallelization
+  # skip.groups (boolean): shall carving p-values for groups selected less than min(gamma) * B times be omitted
+  # return.nonaggr (boolean): shall raw p-values be returned
+  # return.sel.models (boolean): shall the information, which model was selected be returned
+  # verbose (boolean): whether to print key steps
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
     stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
@@ -927,30 +927,29 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
                                      parallel = FALSE, ncores = getOption("mc.cores", 2L),
                                      return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model, calculate carving p-values B times and determine the corresponding CI
-  # x: matrix of predictors
-  # y: response vector
-  # B: number of splits
-  # fraction: fraction used for selection
-  # gamma: quantiles to consider, if several, additional penalty is applied
-  # FWER: shall a FWER correction be applied
-  # ci.level: level of the confindence interval
-  # family: gaussian or binomial
-  # model.selector: how the model is chosen (must be some version of Lasso)
-  # args.model.selector: additional arguments for the selection process
-  # se.estimator: how sigma is estimated, "1se", "modwise", "min" or "None"
-  # args.se.estimator: additional arguments to estimate sigma
-  # args.lasso.inference: additional arguments for inference after Lasso
-  # ci.timeout: maximum time to search for an uncovered point before setting the bound to Inf/ -Inf
-  # split.pval: shall p-values and confidence intervals for splitting be determined as well
-  # classical.fit: function to calculate splitting p-values
-  # args.classical.fit: additional arguments for calculating splitting p-values
-  # args.classical.fit: additional arguments for calculating splitting CI
-  # parallel: whether to parallelize the splits (CI calculation is never parallelized)
-  # ncores: number of cores for parallelization
-  # skip.variables: shall carving p-values for variables selected less than min(gamma) * B times be omitted
-  # return.nonaggr: shall raw p-values be returned
-  # return sel.models: shall the information, which model was selected be returned
-  # verbose: whether to print key steps
+  # x (matrix): matrix of predictors
+  # y (vector): response vector
+  # B (integer): number of splits
+  # fraction (numeric in (0,1)): fraction used for selection
+  # gamma (numeric or vector of numeric in (0,1]): quantiles to consider, if several, additional penalty is applied
+  # FWER (boolean): shall a FWER correction be applied
+  # ci.level (numeric in (0,1)): level of the confindence interval
+  # family (string): "gaussian" or "binomial"
+  # model.selector (function): how the model is chosen (must be some version of Lasso)
+  # args.model.selector (list): additional arguments for the selection process
+  # se.estimator (string): how sigma is estimated, "1se", "modwise", "min" or "None"
+  # args.se.estimator (list): additional arguments to estimate sigma
+  # args.lasso.inference (list): additional arguments for inference after Lasso
+  # ci.timeout (numeric > 0): maximum time to search for an uncovered point before setting the bound to Inf/ -Inf
+  # split.pval (boolean): shall p-values and confidence intervals for splitting be determined as well
+  # classical.fit (function): function to calculate splitting p-values
+  # args.classical.fit (list): additional arguments for calculating splitting p-values
+  # args.classical.ci (list): additional arguments for calculating splitting CI
+  # parallel (boolean): whether to parallelize the splits (CI calculation is never parallelized)
+  # ncores (integer): number of cores for parallelization
+  # return.nonaggr (boolean): shall raw p-values be returned
+  # return.sel.models (boolean): shall the information, which model was selected be returned
+  # verbose (boolean): whether to print key steps
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
     stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
