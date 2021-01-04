@@ -1,10 +1,11 @@
 # Multicarving
 R Software for inference using multicarving as presented in https://arxiv.org/abs/2006.04613
 
-The code for this project consists of 8 files:
+The code for this project consists of the following files: 
  - In /inference/  
    - 3 files for methodology: hdi_adjustments.R; carving.R; sample_from_truncated.R;   
    - 1 file for error handling: tryCatch-W-E.R (not my own work);  
+ - examples.R;
  - In /simulation_setups/  
    - 4 files for simulations: carving_simulation.R; carving_binomial_simulation.R; carving_group_simulation; carving_ci_simulation.R
 
@@ -15,12 +16,15 @@ The user will mainly interact with the following four functions:
    - carve100: Function to execute the whole process of pure post-selection inference, i.e. selecting a model and calculating p-values using all data for selection. Must at       least provide predictor matrix (x) and response vector (y).
    - multi.carve.group: Function to execute the whole multicarving process for groups, i.e. selecting a model and performing groupwise inference on each split as well as           calculate multicarving p-values. Must at least provide predictor matrix (x) and response vector (y) and a list of vectors for the groups that shall be tested.
    - multi.carve.ci.saturated: Function to determine multicarving confidence intervals using the saturated viewpoint, i.e. selecting a model and infering on each split as         well as calculate multicarving p-values and confindence intervals afterwards. Must at least provide predictor matrix (x) and response vector (y).
+A description of all the available arguments can be found in the respective code for the functions.
 
 carving.R: Routines to calculate carving p-values. Does the necessary preprocessing as well as the evaluation of the MCMC samples. 
 
 sample_from_truncated.R: Hit-and-run MCMC sampler for truncated, multivariate, white Gaussian.
 
 tryCatch-W-E.R: Tries execution of the statement and stores potential errors and warnings. Provided to me by Claude Renaux.
+
+examples.R: Creates a simple data-set on which carving can be performed. The required command for each of the functions above is stated relying on default values for arguments wherever possible. Users are encouraged to play around with non-default parameters as well. 
 
 carving_simulation.R: Executes simulations as described in Section 4.1., default is the Toeplitz design with inference in the selected model. For other scenarios, slight adjustments have to be done. Especially, undo the comments under # riboflavin if doing simulations for the riboflavin data. Do sigma.estimator = "modwise" to estimate σ on a per model base, use_lambda.min = TRUE (in args.model.selector) to do cross-validated lasso using λmin, selected = FALSE (in args.lasso.inference) for inference in the saturated model. Further changes are possible based on user’s needs.
 
