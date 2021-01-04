@@ -9,6 +9,7 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
                         parallel = FALSE, ncores = getOption("mc.cores", 2L), skip.variables = TRUE,
                         return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model and calculate carving p-values B times
+  # Input
   # x (matrix): matrix of predictors
   # y (vector): response vector
   # B (integer): number of splits
@@ -30,6 +31,14 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
   # return.nonaggr (boolean): shall raw p-values be returned
   # return.sel.models (boolean): shall the information, which model was selected be returned
   # verbose (boolean): whether to print key steps
+  # Output (if split.pval = TRUE,  a list of two output elements is created)
+  # pval.corr (p - vector): multicarving / multisplitting p-values
+  # gamma.min (p - vector): which value of gamma minimized the p-value
+  # optional: pvals.nonaggr (B x p matrix): p-values before aggregation
+  # optional: sel.models (boolean B x p matrix): TRUE if variable was selected in given split
+  # FWER (boolean): was a multiplicity correction applied?
+  # method ("multi.carve" or "multi.split"): additional output information
+  # call: function call to obtain this carving result
 
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
@@ -372,8 +381,8 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
       }
       method = "multi.carve"
       if (icf == 2) method = "multi.split"
-      ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                                  gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
+      ls[[icf]] <- structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma],
+                                  pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
                                   method = method, call = match.call()), class = "carve")
       
     }
@@ -405,8 +414,8 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
                 "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
       rm(list = setdiff(names(environment()), keep))
     }
-    structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                   gamma.min = gamma[which.gamma], sel.models = sel.models, FWER = FWER,
+    structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma],
+                   pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
                    method = "multi.carve", call = match.call()), class = "carve")
   }
 }
@@ -416,6 +425,7 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
                       estimate.sigma = TRUE, df.corr = FALSE, args.lasso.inference = list(sigma = NA),
                       return.selmodels = FALSE, verbose = FALSE) {
   # routine to select a model and perform pure post-selection inference
+  # Input
   # x (matrix): matrix of predictors
   # y (vector): response vector
   # FWER (boolean): shall a FWER correction be applied
@@ -427,6 +437,12 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
   # args.lasso.inference (list): additional arguments for inference after Lasso
   # return.sel.models (boolean): shall the information, which model was selected be returned
   # verbose (boolean): whether to print key steps
+  # Output
+  # pval.corr (p - vector): p-values from carve100
+  # optional: sel.models (boolean B x p matrix): TRUE if variable was selected in given split
+  # FWER (boolean): was a multiplicity correction applied?
+  # method ("carve100"): additional output information
+  # call: function call to obtain this carving result
 
   if (!(family %in% c("gaussian", "binomial")))
     stop ("Invalid family provided, can only deal with gaussian and binomial")
@@ -592,8 +608,8 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
               "pvals", "sel.models", "FWER")
     rm(list = setdiff(names(environment()), keep))
   }
-  structure(list(pval.corr = pvals, FWER= FWER,
-                 sel.models = sel.models, method = "carve100", call = match.call()), class = "carve")
+  structure(list(pval.corr = pvals, sel.models = sel.models,  FWER= FWER,
+                 method = "carve100", call = match.call()), class = "carve")
 }
 
 multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B) >= 0.05], FWER = FALSE, family = "gaussian", 
@@ -604,6 +620,7 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
                                return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   
   # routine to split the data, select a model and calculate carving p-values for groups B times
+  # Input
   # x (matrix): matrix of predictors
   # y (vector): response vector
   # groups (list of vectors of indices): groups for which a p-value shall be determined
@@ -623,6 +640,14 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
   # return.nonaggr (boolean): shall raw p-values be returned
   # return.sel.models (boolean): shall the information, which model was selected be returned
   # verbose (boolean): whether to print key steps
+  # Output (let g be the number of groups)
+  # pval.corr (g - vector): multicarving p-values
+  # gamma.min (g - vector): which value of gamma minimized the p-value
+  # optional: pvals.nonaggr (B x g matrix): p-values before aggregation
+  # optional: sel.models (boolean B x p matrix): TRUE if variable was selected in given split
+  # FWER (boolean): was a multiplicity correction applied?
+  # method ("multi.carve.group"): additional output information
+  # call: function call to obtain this carving result
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
     stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
@@ -913,9 +938,9 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
               "pvals", "pvals.current", "which.gamma", "sel.models", "FWER")
     rm(list = setdiff(names(environment()), keep))
   }
-  structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                 gamma.min = gamma[which.gamma], FWER = FWER,
-                 sel.models = sel.models, method = "multi.carve.group", call = match.call()), class = "carve")
+  structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma],
+                 pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
+                 method = "multi.carve.group", call = match.call()), class = "carve")
 }
 
 multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B) >= 0.05], FWER = FALSE, ci.level = 0.95,
@@ -927,6 +952,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
                                      parallel = FALSE, ncores = getOption("mc.cores", 2L),
                                      return.nonaggr = FALSE, return.selmodels = FALSE, verbose = FALSE) {
   # routine to split the data, select a model, calculate carving p-values B times and determine the corresponding CI
+  # Input
   # x (matrix): matrix of predictors
   # y (vector): response vector
   # B (integer): number of splits
@@ -950,6 +976,21 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
   # return.nonaggr (boolean): shall raw p-values be returned
   # return.sel.models (boolean): shall the information, which model was selected be returned
   # verbose (boolean): whether to print key steps
+  # Output (if split.pval = TRUE,  a list of two output elements is created)
+  # pval.corr (p - vector): multicarving / multisplitting p-values
+  # gamma.min (p - vector): which value of gamma minimized the p-value
+  # ci.level (numeric in (0,1)): level of the confidence interval
+  # lci (p - vector): lower end of confidence interval
+  # uci (p - vector): upper end of confidence interval
+  # optional: pvals.nonaggr (B x p matrix): p-values before aggregation
+  # optional: sel.models (boolean B x p matrix): TRUE if variable was selected in given split
+  # FWER (boolean): was a multiplicity correction applied?
+  # only for carving: vlo (B x p matrix): lower end of constrained region
+  # only for carving: vup (B x p matrix): upper end of constrained region
+  # only for carving: centers (B x p matrix): estimate of parameter in given model
+  # ses (B x p matrix): estimate of standard error of parameter in given model
+  # method ("multi.carve" or "multi.split"): additional output information
+  # call: function call to obtain this carving result
   
   if (!(se.estimator %in% c("1se", "min", "modwise", "None")))
     stop("Sigma estimator must be one of \"1se\", \"min\", \"modwise\" or \"None\" ")
@@ -1328,15 +1369,16 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
         }
       }
       if (icf == 1) {
-        ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                                    ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve, centers = estimates,
-                                    uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
-                                    sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
+        ls[[icf]] <- structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma], 
+                                    ci.level = ci.level, lci = lci.current, uci = uci.current,
+                                    pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
+                                    vlo = vlo, vup = vup, centers = estimates, ses = sescarve,
+                                    method = "multi.carve", call = match.call()), class = "carve")
       } else {
-        ls[[icf]] <- structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals,
-                                    ci.level = ci.level, lci =  lci.current, ses=ses,
-                                    uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
-                                    sel.models = sel.models, method = "multi.split", call = match.call()), class = "carve")
+        ls[[icf]] <- structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma],
+                                    ci.level = ci.level, lci =  lci.current, uci = uci.current,
+                                    pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
+                                    ses = ses, method = "multi.split", call = match.call()), class = "carve")
       }
     }
     return(ls)
@@ -1385,14 +1427,13 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
                 "lci.current", "uci.current", "vlo", "vup", "sescarve", "estimates")
       rm(list = setdiff(names(environment()), keep))
     }
-    structure(list(pval.corr = pvals.current, pvals.nonaggr = pvals, 
-                   ci.level = ci.level, lci = lci.current, vlo = vlo, vup = vup, ses = sescarve, centers = estimates,
-                   uci = uci.current, gamma.min = gamma[which.gamma], FWER = FWER,
-                   sel.models = sel.models, method = "multi.carve", call = match.call()), class = "carve")
+    structure(list(pval.corr = pvals.current, gamma.min = gamma[which.gamma], 
+                   ci.level = ci.level, lci = lci.current, uci = uci.current,
+                   pvals.nonaggr = pvals, sel.models = sel.models, FWER = FWER,
+                   vlo = vlo, vup = vup, centers = estimates, ses = sescarve,
+                   method = "multi.carve", call = match.call()), class = "carve")
   }
 }
-
-
 
 pval.aggregator <- function(pval.list, gamma, cutoff = TRUE) {
   aggregated.list <- list()
