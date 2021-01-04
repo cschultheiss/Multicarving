@@ -32,6 +32,6 @@ carving__group_simulation.R: Executes simulations as described in Section 4.3, d
 
 carving_ci_simulation.R: Executes simulations as described in section 4.2. Changes are possible based on user’s needs.
 
-All simulation files store the data needed for the analysis. Due to recent changes in the code, the obtained results will not be exactly the same as shown in the paper. However, as the methodology is not changed per se, the results should stay fairly similar.
+All simulation files store the data needed for the analysis. Due to recent changes in the code (that affect some calls of random functions), the obtained results will not be exactly the same as shown in the paper. However, as the methodology is not changed per se, the results should stay fairly similar.
 
 
