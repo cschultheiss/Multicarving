@@ -8,7 +8,7 @@ require(tmg)
 
 # adjust depending on folder structure
 source("inference/hdi_adjustments.R")
-source("inference/optimal_inference.R")
+source("inference/carving.R")
 source("inference/sample_from_truncated.R")
 source("inference/tryCatch-W-E.R")
 
@@ -30,6 +30,8 @@ y.true <- x %*% beta
 sigma <- 2
 y <- y.true + sigma * rnorm(n)
 
+# redefining the random seed every time will make sure that the same splits
+# are used and the same models are selected. Of course, this is not mandatory.
 set.seed(12)
 mc <- multi.carve(x, y)
 mc
