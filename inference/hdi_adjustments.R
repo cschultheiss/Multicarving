@@ -1156,6 +1156,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
       if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
         stop("The carve procedure returned values below 0 or above 1 as p-values")
       }
+      sel.pval1 <- 2 * pmin(sel.pval1, 1 - sel.pval1)
       if (FWER) {
         sel.pval1 <- pmin(sel.pval1 * p.sel, 1) # for FWER
       } else {
