@@ -11,14 +11,12 @@ The code for this project consists of the following files:
 
 
 hdi_adjustments.R: Functions adapted from the ‘hdi’-package in order to change multisplitting routines to multicarving routines
-The user will mainly interact with the following four functions:
+The user will mainly interact with the following four functions; a description of all the available arguments can be found in the respective code for the functions.:
    - multi.carve: Function to execute the whole multicarving process, i.e. selecting a model and infering on each split as well as calculate multicarving p-values. Must at         least provide predictor matrix (x) and response vector (y).
    - carve100: Function to execute the whole process of pure post-selection inference, i.e. selecting a model and calculating p-values using all data for selection. Must at       least provide predictor matrix (x) and response vector (y).
    - multi.carve.group: Function to execute the whole multicarving process for groups, i.e. selecting a model and performing groupwise inference on each split as well as           calculate multicarving p-values. Must at least provide predictor matrix (x) and response vector (y) and a list of vectors for the groups that shall be tested.
    - multi.carve.ci.saturated: Function to determine multicarving confidence intervals using the saturated viewpoint, i.e. selecting a model and infering on each split as         well as calculate multicarving p-values and confindence intervals afterwards. Must at least provide predictor matrix (x) and response vector (y).
-   
-A description of all the available arguments can be found in the respective code for the functions.
-
+  
 carving.R: Routines to calculate carving p-values. Does the necessary preprocessing as well as the evaluation of the MCMC samples. 
 
 sample_from_truncated.R: Hit-and-run MCMC sampler for truncated, multivariate, white Gaussian.
