@@ -11,7 +11,7 @@ The code for this project consists of the following files:
 
 
 hdi_adjustments.R: Functions adapted from the ‘hdi’-package in order to change multisplitting routines to multicarving routines. The user will mainly interact with the following four functions; a description of all the available arguments can be found in the respective code for the functions.:
-   - multi.carve: Function to execute the whole multicarving process, i.e. selecting a model and infering on each split as well as calculate multicarving p-values. Must at         least provide predictor matrix (x) and response vector (y).
+   - multi.carve: Function to execute the whole multicarving process, i.e. selecting a model and infering on each split as well as calculating multicarving p-values. Must at         least provide predictor matrix (x) and response vector (y).
    - carve100: Function to execute the whole process of pure post-selection inference, i.e. selecting a model and calculating p-values using all data for selection. Must at       least provide predictor matrix (x) and response vector (y).
    - multi.carve.group: Function to execute the whole multicarving process for groups, i.e. selecting a model and performing groupwise inference on each split as well as           calculate multicarving p-values. Must at least provide predictor matrix (x) and response vector (y) and a list of vectors for the groups that shall be tested.
    - multi.carve.ci.saturated: Function to determine multicarving confidence intervals using the saturated viewpoint, i.e. selecting a model and infering on each split as         well as calculate multicarving p-values and confindence intervals afterwards. Must at least provide predictor matrix (x) and response vector (y).
@@ -24,7 +24,7 @@ tryCatch-W-E.R: Tries execution of the statement and stores potential errors and
 
 examples.R: Creates a simple data-set on which carving can be performed. The required command for each of the functions above is stated relying on default values for arguments wherever possible. Users are encouraged to play around with non-default parameters as well. 
 
-carving_simulation.R: Executes simulations as described in Section 4.1., default is the Toeplitz design with inference in the selected model. For other scenarios, slight adjustments have to be done. Especially, undo the comments under # riboflavin if doing simulations for the riboflavin data. Do sigma.estimator = "modwise" to estimate σ on a per model base, use_lambda.min = TRUE (in args.model.selector) to do cross-validated lasso using λmin, selected = FALSE (in args.lasso.inference) for inference in the saturated model. Further changes are possible based on user’s needs.
+carving_simulation.R: Executes simulations as described in Section 4.1., default is the Toeplitz design with inference in the selected model. For other scenarios, slight adjustments have to be done. Especially, undo the comments under # riboflavin if doing simulations for the riboflavin data. Do sigma.estimator = "modwise" to estimate σ on a per model base, use_lambda.min = TRUE (in args.model.selector) to do cross-validated lasso using λmin or selected = FALSE (in args.lasso.inference) for inference in the saturated model. Further changes are possible based on user’s needs.
 
 carving_binomial_simulation.R: Executes simulations as described in Section 4.4. Changes are possible based on user’s needs.
 
