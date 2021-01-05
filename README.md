@@ -24,9 +24,9 @@ tryCatch-W-E.R: Tries execution of the statement and stores potential errors and
 
 examples.R: Creates a simple data-set on which carving can be performed. The required command for each of the functions above is stated relying on default values for arguments wherever possible. Users are encouraged to play around with non-default parameters as well. 
 
-carving_simulation.R: Executes simulations as described in Section 4.1., default is the Toeplitz design with inference in the selected model. For other scenarios, slight adjustments have to be done. Especially, undo the comments under # riboflavin if doing simulations for the riboflavin data. Do sigma.estimator = "modwise" to estimate σ on a per model base, use_lambda.min = TRUE (in args.model.selector) to do cross-validated lasso using λmin or selected = FALSE (in args.lasso.inference) for inference in the saturated model. Further changes are possible based on user’s needs.
+carving_simulation.R: Executes simulations as described in Section 4.1, default is the Toeplitz design with inference in the selected model. For other scenarios, slight adjustments have to be done. Especially, undo the comments under # riboflavin if doing simulations for the riboflavin data. Do sigma.estimator = "modwise" to estimate σ on a per model base, use_lambda.min = TRUE (in args.model.selector) to do cross-validated lasso using λmin or selected = FALSE (in args.lasso.inference) for inference in the saturated model. Further changes are possible based on user’s needs.
 
-carving_binomial_simulation.R: Executes simulations as described in Section 4.4. Changes are possible based on user’s needs.
+carving_binomial_simulation.R: Executes simulations as described in Section 4.4 Changes are possible based on user’s needs.
 
 carving__group_simulation.R: Executes simulations as described in Section 4.3, default is the dense alternative. Adjustments for the sparse alternative are described through commented code. Further changes are possible based on user’s needs.
 
