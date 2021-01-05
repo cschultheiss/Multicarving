@@ -46,7 +46,7 @@ print (x[1,1])
 xb <- x %*% beta
 p.true <- exp(xb) / (1 + exp(xb))
 
-B.vec <- c(1, (1:5) * 10) # number of splits
+B.vec <- c(1, (1:5) * 10) # number of splits 
 frac.vec <- c(0.5, 0.75, 0.9, 0.95, 0.99) # selection fraction
 
 nsim <- 200
