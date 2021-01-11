@@ -158,16 +158,17 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
             fit.again) split.again <- TRUE
       }
       if (split.again) {
-        reason <- numeric(0)
+        reason <- character(0)
         if (args.model.selector$intercept){
-          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
-          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x2 rank")
         } else {
-          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
-          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x2 rank")
         }
         
-        if (fit.again) reason <- c(reason, "3")
+        if (fit.again) reason <- c(reason, "fit")
+        if (!is.null(checktry$error)) reason <- c(reason, "error while checking")
         split.count <- split.count + 1
         if (split.count > 4) {
           stop(paste("More than 5 splits needed, final reason:", reason))
@@ -766,16 +767,17 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
             fit.again) split.again <- TRUE
       }
       if (split.again) {
-        reason <- numeric(0)
+        reason <- character(0)
         if (args.model.selector$intercept){
-          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
-          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x2 rank")
         } else {
-          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
-          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x2 rank")
         }
         
-        if (fit.again) reason <- c(reason, "3")
+        if (fit.again) reason <- c(reason, "fit")
+        if (!is.null(checktry$error)) reason <- c(reason, "error while checking")
         split.count <- split.count + 1
         if (split.count > 4) {
           stop(paste("More than 5 splits needed, final reason:", reason))
@@ -1121,16 +1123,17 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
             fit.again) split.again <- TRUE
       }
       if (split.again) {
-        reason <- numeric(0)
+        reason <- character(0)
         if (args.model.selector$intercept){
-          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "1")
-          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "2")
+          if (rankMatrix(cbind(rep(1, n.left), x.left[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right - 1 && rankMatrix(cbind(rep(1, n.right), x.right[,sel.model]))[[1]] < (p.sel + 1)) reason <- c(reason, "x2 rank")
         } else {
-          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "1")
-          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "2")
+          if (rankMatrix( x.left[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x1 rank")
+          if (p.sel < n.right && rankMatrix(x.right[,sel.model])[[1]] < (p.sel)) reason <- c(reason, "x2 rank")
         }
         
-        if (fit.again) reason <- c(reason, "3")
+        if (fit.again) reason <- c(reason, "fit")
+        if (!is.null(checktry$error)) reason <- c(reason, "error while checking")
         split.count <- split.count + 1
         if (split.count > 4) {
           stop(paste("More than 5 splits needed, final reason:", reason))
