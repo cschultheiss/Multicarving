@@ -28,7 +28,7 @@ carving_simulation.R: Executes simulations as described in Section 4.1, default 
 
 carving_binomial_simulation.R: Executes simulations as described in Section 4.4 Changes are possible based on user’s needs.
 
-carving__group_simulation.R: Executes simulations as described in Section 4.3, default is the dense alternative. Adjustments for the sparse alternative are described through commented code. Further changes are possible based on user’s needs.
+carving_group_simulation.R: Executes simulations as described in Section 4.3, default is the dense alternative. Adjustments for the sparse alternative are described through commented code. Further changes are possible based on user’s needs.
 
 carving_ci_simulation.R: Executes simulations as described in section 4.2. Changes are possible based on user’s needs.
 
