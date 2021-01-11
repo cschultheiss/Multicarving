@@ -197,8 +197,9 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
     }
     sel.models <- myExtract.sel("sel.models")
     times.selected <- apply(sel.models, 2, sum)
-    which.check <- which(times.selected >= min(gamma) *B)
-    warning(paste("Reducing number of tests from", sum(sel.models), "to", sum(sel.models[, which.check])))
+    which.check <- which(times.selected >= min(gamma) * B)
+    if (sum(sel.models) > sum(sel.models[, which.check]))
+      warning(paste("Reducing number of tests from", sum(sel.models), "to", sum(sel.models[, which.check])))
   } else {
     which.check <- NULL
   }
@@ -261,8 +262,8 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
         stop("The carve procedure returned a p-value NA")
       } 
       if (length(sel.pval1) != p.sel) { 
-        stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel.",
-                   p.sel, length(sel.pval1)))
+        stop(paste("The carve procedure didn't return the correct number of p-values for the provided submodel. Expected",
+                   p.sel, "received", length(sel.pval1)))
       }
       if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
         stop("The carve procedure returned values below 0 or above 1 as p-values")
@@ -492,7 +493,7 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
     if (!check) {
       fit.again <- TRUE
       thresh.count <- thresh.count + 1
-      if (thresh.count > 4) {
+      if (thresh.count > 2) {
         warning("Giving up reducing threshhold")
         abort <- TRUE
         break()
@@ -514,7 +515,7 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
       if (family == "binomial") beta <- coefs
       p.sel <- length(sel.model)
       if (p.sel == 0) fit.again <- FALSE
-      warning(paste("reducing threshold", thresh.count, "from", threshn))
+      warning(paste("reducing threshold", thresh.count, "to", threshn))
     }
   }
   if (abort) {
@@ -574,8 +575,8 @@ carve100 <- function (x, y, FWER = TRUE, family = "gaussian", model.selector = l
       if (any(is.na(sel.pval1))) 
         stop("The carve 100 procedure returned a p-value NA")
       if (length(sel.pval1) != p.sel) { 
-        stop(paste("The carve 100 procedure didn't return the correct number of p-values for the provided submodel.",
-                   p.sel, length(sel.pval1)))
+        stop(paste("The carve 100 procedure didn't return the correct number of p-values for the provided submodel. Expected",
+                   p.sel, "received", length(sel.pval1)))
       }
       if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) 
         stop("The carve 100 procedure returned values below 0 or above 1 as p-values")
@@ -813,7 +814,8 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
     }
     times.selected <- apply(sel.groups, 2, sum)
     which.check <- which(times.selected >= min(gamma) * B)
-    warning(paste("Reducing number of tests from", sum(sel.groups), "to", sum(sel.groups[, which.check])))
+    if (sum(sel.groups) > sum(sel.groups[, which.check]))
+      warning(paste("Reducing number of tests from", sum(sel.groups), "to", sum(sel.groups[, which.check])))
   } else {
     which.check <- NULL
   }
@@ -871,8 +873,8 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
         stop("The carve procedure returned a p-value NA")
       } 
       if (length(sel.pval1) != length(groups)) { 
-        stop(paste("The carve procedure didn't return the correct number of p-values for the provided groups.",
-                   length(groups), length(sel.pval1)))
+        stop(paste("The carve procedure didn't return the correct number of p-values for the provided groups. Expected",
+                   length(groups), "received", length(sel.pval1)))
       }
       if (!all(sel.pval1 >= 0 & sel.pval1 <= 1)) {
         stop("The carve procedure returned values below 0 or above 1 as p-values")
@@ -1186,7 +1188,6 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
       sel.estimates <- fLI$estimates
       
       if (any(is.na(sel.pval1))) {
-        warning(sel.pval1)
         stop("The carve procedure returned a p-value NA")
       } 
       
