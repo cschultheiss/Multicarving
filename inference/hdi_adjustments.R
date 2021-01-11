@@ -254,7 +254,7 @@ multi.carve <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B)/B)[((1:B)/B
              split = split)
       } else if (!is.null(fLItry$warning)) {
         for (war in unique(fLItry$warning)) {
-          warning(paste(war, sep = " "))
+          warning(paste("Split", sel$B, ":", war, sep = " "))
         }
       }
       fLI <- fLItry$value
@@ -866,7 +866,7 @@ multi.carve.group <- function (x, y, groups, B = 50, fraction = 0.9, gamma = ((1
              split = split)
       } else if (!is.null(fLItry$warning)) {
         for (war in unique(fLItry$warning)) {
-          warning(paste(war, sep = " "))
+          warning(paste("Split", sel$B, ":", war, sep = " "))
         }
       }
       fLI <- fLItry$value
@@ -1180,7 +1180,7 @@ multi.carve.ci.saturated <- function(x, y, B = 50, fraction = 0.9, gamma = ((1:B
              vlo = vlo.v, vup = vup.v, estimates= estimates.v, split = split)
       } else if (!is.null(fLItry$warning)) {
         for (war in unique(fLItry$warning)) {
-          warning(paste(war, sep = " "))
+          warning(paste("Split", b, ":", war, sep = " "))
         }
       }
       fLI <- fLItry$value
