@@ -27,8 +27,8 @@ sample.truncnorm.white <- function( A, b, initial, bias.direction, how.often = 1
   U <- A %*% state - b
   # max(U) < 0 if KKT actually fulfilled exactly
   if (max(U) > 0) {
-    fc <- sum(U > 0) / nconstraint
-    stop(paste(fc, "unfulfilled constraints at entry"))
+    fc <- sum(U > 0)
+    stop(paste(fc, "out of", nconstraint, "unfulfilled constraints at entry"))
   }
   neta <- dim(bias.direction)[2] # 1 for single variable testing
   # choose random number a priori
@@ -189,7 +189,7 @@ sample.truncnorm.white <- function( A, b, initial, bias.direction, how.often = 1
         
       }
     }
-    if (tnorm > upper.bound || tnorm < lower.bound) stop("new value exceeded bounds")
+    if (tnorm > upper.bound || tnorm < lower.bound) stop("new value exceeds bounds")
 
     iter.count <- iter.count + 1
     if (docoord == 1) {

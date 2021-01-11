@@ -287,10 +287,12 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
       if (skip) nskipped <- nskipped + 1
       skip <<- FALSE
     }
-    if (intercept){
-      warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s-1, "variables"))
-    } else {
-      warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s, "variables"))
+    if (nskipped > 0){
+      if (intercept){
+        warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s-1, "variables"))
+      } else {
+        warning(paste("Hamiltonian sampler failed for", nskipped, "out of", s, "variables"))
+      }
     }
     
     if (intercept) pvalues <- pvalues[-1]
@@ -676,7 +678,8 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
     if (skip) nskipped <- nskipped + 1
     skip <<- FALSE
   }
-  warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngroup.tested, "groups"))
+  if (nskipped > 0)
+    warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngroup.tested, "groups"))
   return(list(pv = pvaluessum))
 }
 
@@ -771,21 +774,21 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
                                                timeout = time.limit, on_timeout = "error"), 0)
     time <- toc(quiet = TRUE)
     time.diff <- round(time$toc - time$tic, 4)
+
     if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
       skip <<- TRUE
       if (ft){
-        first.text <- "this variable was tested for the first time;"
+        first.text <- ". This variable was tested for the first time;"
       } else {
-        first.text <- "this variable was not tested for the first time;"
+        first.text <- ". This variable was not tested for the first time;"
       }
-      warning(paste("Hamiltonian not successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
-      warning(paste("Evaluation of Hamiltonian sampler not successful:", trywhite$error, first.text, "using hit-and-run sampler"))
+      warning(paste("Hamiltonian not successful after", time.diff, "seconds for", nsample, "samples,", nw, "dimensions and", nconstraint,
+                    "constraints. Reason:", trywhite$error, first.text, "using hit-and-run sampler instead."))
       #  sample from whitened points with new constraints
       Z <- sample.truncnorm.white(new.A, new.b, white.Y, white.direction.of.interest,
                                               how.often = how.often, ndraw = ndraw, burnin = burnin,
                                               sigma = 1, use.A = use.constraint.directions)
     } else {
-      warning(paste("Hamiltonian successful after", time.diff, "for", nsample, "samples,", nw, "dimensions and", nconstraint, "constraints"))
       Z <- trywhite$value
     }
     
