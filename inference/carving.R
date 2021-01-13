@@ -213,10 +213,6 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
         conditional.law.mean <- rep(0, dim(conditional.linear)[2])
       }
       
-      skip <<- FALSE # indicator whether Hamiltonian sampler shall be skipped right away
-      ft <<- TRUE # indicator whether it is the first chain for the given covariate
-      # both indicators are to be shared with other functions
-      
       white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean, rank = DOF)
       forward.map <- white.out$forward.map
       inverse.map <- white.out$inverse.map
@@ -227,9 +223,13 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
       if (max (new.A %*% white.Y - new.b) > 0) stop("Constraints not fulfilled after whitening")
       
       # get a sample of points fulfilling all constraints
-      Z <- sample.from.constraints(new.A, new.b,
+      sample.out <- sample.from.constraints(new.A, new.b,
                                    white.Y, white.eta, ndraw = ndraw, burnin = burnin,
-                                   how.often = 10, verbose = verbose, time.constant = time.constant)
+                                   how.often = 10, verbose = verbose, time.constant = time.constant,
+                                   skip = FALSE, ft = TRUE)
+      ft <- TRUE
+      Z <- sample.out$Z
+      skip <- sample.out$skip
       Z <- t(inverse.map(t(Z)))
       continue <- FALSE
       i <- 0
@@ -252,26 +252,33 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
         if (min(pval1, pval2) < sig.level && ft) {
           # if potentially significant
           if (verbose) print("Checking significance with longer chain")
-          ft <<- FALSE
           if (verbose) {
             print(paste("Increasing ndraw to ", 2 * max(min.size, ndraw), "and burnin to ", ndraw))
           }
-          Z <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
+          sample.out <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                        ndraw = 2 * max(min.size, ndraw), burnin = 0,
-                                       how.often = 10, verbose = verbose, time.constant = time.constant)
+                                       how.often = 10, verbose = verbose, time.constant = time.constant,
+                                       skip = skip, ft = FALSE)
+          
+          ft <- FALSE
+          Z <- sample.out$Z
+          skip <- sample.out$skip
           Z <- t(inverse.map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig.level && max(pval1, pval2) > 1.5 * sig.level) {
           # if significance is contradicting on the two parts
           if (verbose) print("Appending the chain")
-          ft <<- FALSE
           if (verbose) {
             print(paste("Adding", 2 * max(min.size, ndraw), "draws"))
           }
-          Zn <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
+          sample.out <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                         ndraw = 2 * max(min.size, ndraw), burnin = 0,
-                                        how.often = 10, verbose = verbose, time.constant = time.constant)
+                                        how.often = 10, verbose = verbose, time.constant = time.constant,
+                                        skip = skip, ft = FALSE)
           
+          ft <- FALSE
+          Zn <- sample.out$Z
+          skip <- sample.out$skip
           Zn <- t(inverse.map(t(Zn)))
           Z <- rbind(Z, Zn)
           continue <- FALSE
@@ -285,7 +292,6 @@ carve.lasso <- function(X, y, ind, beta, tol.beta, lambda, sigma = NULL, family 
         pvalues[j] <- (sum(null.statistics <= observed) + add) / (length(null.statistics) + add)
       }
       if (skip) nskipped <- nskipped + 1
-      skip <<- FALSE
     }
     if (nskipped > 0){
       if (intercept){
@@ -603,10 +609,6 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
         burnin <- ceiling(burnin0 * DOF / 15)
       }
       
-      skip <<- FALSE # indicator whether Hamiltonian sampler shall be skipped right away
-      ft <<- TRUE # indicator whether it is the first chain for the given covariate
-      # both indicators are to be shared with other functions
-      
       white.out <- whiten(conditional.law.covariance, linear.part, b, conditional.law.mean, rank = DOF)
       forward.map <- white.out$forward.map
       inverse.map <- white.out$inverse.map
@@ -617,8 +619,12 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
       if (max (new.A %*% white.Y - new.b) > 0) stop("Constraints not fulfilled after whitening")
       
       # get a sample of points fulfilling all constraints
-      Z <- sample.from.constraints(new.A, new.b, white.Y, white.eta, ndraw = ndraw,
-                                   burnin = burnin, how.often = 10, verbose = verbose, time.constant = time.constant)
+      sample.out <- sample.from.constraints(new.A, new.b, white.Y, white.eta, ndraw = ndraw,
+                                   burnin = burnin, how.often = 10, verbose = verbose, time.constant = time.constant,
+                                   skip = FALSE, ft = TRUE)
+      ft <- TRUE
+      Z <- sample.out$Z
+      skip <- sample.out$skip
       Z <- t(inverse.map(t(Z)))
       
       etasign <- t(t(eta)*sign(beta[chosen[group.vars]]))
@@ -641,10 +647,14 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
         if (min(pval1, pval2) < sig.level && ft) {
           # if potentially significant
           if (verbose) print("Checking significance with longer chain")
-          ft <<- FALSE
-          Z <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
+          sample.out <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                        ndraw = 2 * max(min.size, ndraw), burnin=0,
-                                       how.often = 10, verbose = verbose, time.constant = time.constant)
+                                       how.often = 10, verbose = verbose, time.constant = time.constant,
+                                       skip = skip, ft = FALSE)
+          
+          ft <- FALSE
+          Z <- sample.out$Z
+          skip <- sample.out$skip
           Z <- t(inverse.map(t(Z)))
           continue <- FALSE
         } else if (min(pval1, pval2) < sig.level && max(pval1, pval2) > 1.5 * sig.level) {
@@ -653,10 +663,13 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
           if (verbose) {
             print(paste("Adding", 2 * max(min.size, ndraw), "draws"))
           }
-          ft <<- FALSE
           Zn <- sample.from.constraints(new.A, new.b, forward.map(Z[lennull, ]), white.eta,
                                         ndraw = 2 * max(min.size, ndraw), burnin = 0,
-                                        how.often = 10, verbose = verbose, time.constant = time.constant)
+                                        how.often = 10, verbose = verbose, time.constant = time.constant,
+                                        skip = skip, ft = FALSE)
+          ft <- FALSE
+          Zn <- sample.out$Z
+          skip <- sample.out$skip
           Zn <- t(inverse.map(t(Zn)))
           Z <- rbind(Z, Zn)
           continue <- FALSE
@@ -676,7 +689,6 @@ carve.lasso.group <- function(X, y, ind, groups, beta, tol.beta, lambda, sigma =
       pvaluessum[j] <- 1
     }
     if (skip) nskipped <- nskipped + 1
-    skip <<- FALSE
   }
   if (nskipped > 0)
     warning(paste("Hamiltonian sampler failed for", nskipped, "out of", ngroup.tested, "groups"))
@@ -748,7 +760,8 @@ whiten <- function(cov, linear.part, b, mmean, rank = NULL) {
 
 sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.interest,
                             how.often = -1, ndraw = 1000, burnin = 1000, white = FALSE,
-                            use.constraint.directions = TRUE, verbose = FALSE, time.constant = 1e-6) {
+                            use.constraint.directions = TRUE, verbose = FALSE, time.constant = 1e-6,
+                            skip = FALSE, ft = TRUE) {
   # routine to do whitening, activate the sampler, and recolour the samples
   if (how.often < 0) {
     how.often <- ndraw + burnin
@@ -776,7 +789,7 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
     time.diff <- round(time$toc - time$tic, 4)
 
     if (!is.null(trywhite$error) || !is.matrix(trywhite$value)) {
-      skip <<- TRUE
+      skip <- TRUE
       if (ft){
         first.text <- ". This variable was tested for the first time;"
       } else {
@@ -793,7 +806,7 @@ sample.from.constraints <- function(new.A, new.b, white.Y, white.direction.of.in
     }
     
   }
-  return(Z)
+  return(list(Z = Z, skip = skip))
 }
 
 
